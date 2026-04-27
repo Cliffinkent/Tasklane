@@ -1,7 +1,14 @@
 import { useDroppable } from '@dnd-kit/core'
 import Card from './Card'
 
-export default function Column({ columnId, title, tasks, onMoveTask, onEditTask }) {
+export default function Column({
+  columnId,
+  title,
+  tasks,
+  onMoveTask,
+  onEditTask,
+  onDeleteTask,
+}) {
   const { setNodeRef, isOver } = useDroppable({ id: columnId })
 
   return (
@@ -14,6 +21,7 @@ export default function Column({ columnId, title, tasks, onMoveTask, onEditTask 
             task={task}
             onMove={onMoveTask}
             onEdit={onEditTask}
+            onDelete={onDeleteTask}
           />
         ))}
       </div>

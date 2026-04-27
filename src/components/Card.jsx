@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useDraggable } from '@dnd-kit/core'
 import { COLUMNS } from '../data/columns'
 
-function CardContent({ task, onMove, onEdit, isOverlay = false }) {
+function CardContent({ task, onMove, onEdit, onDelete, isOverlay = false }) {
   const [showMoveMenu, setShowMoveMenu] = useState(false)
   const otherColumns = COLUMNS.filter((c) => c.id !== task.columnId)
 
@@ -64,6 +64,18 @@ function CardContent({ task, onMove, onEdit, isOverlay = false }) {
             >
               Edit
             </button>
+            <button
+              type="button"
+              className="card-delete-btn"
+              onClick={(e) => {
+                e.stopPropagation()
+                onDelete?.(task.id)
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
+              aria-label="Delete task"
+            >
+              Delete
+            </button>
           </div>
         )}
       </div>
@@ -74,7 +86,7 @@ function CardContent({ task, onMove, onEdit, isOverlay = false }) {
   )
 }
 
-export default function Card({ task, onMove, onEdit }) {
+export default function Card({ task, onMove, onEdit, onDelete }) {
   const {
     attributes,
     listeners,
@@ -92,7 +104,7 @@ export default function Card({ task, onMove, onEdit }) {
       {...attributes}
       {...listeners}
     >
-      <CardContent task={task} onMove={onMove} onEdit={onEdit} />
+      <CardContent task={task} onMove={onMove} onEdit={onEdit} onDelete={onDelete} />
     </div>
   )
 }

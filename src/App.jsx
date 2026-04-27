@@ -1,11 +1,16 @@
+import { useRef, useState, useEffect } from 'react'
 import { useLocalStorage } from './hooks/useLocalStorage'
 import { useTheme } from './hooks/useTheme'
 import Board from './components/Board'
 import './App.css'
 
+const UNDO_MS = 5000
+
 function App() {
   const [tasks, setTasks] = useLocalStorage()
   const [theme, toggleTheme] = useTheme()
+  const [deletedForUndo, setDeletedForUndo] = useState(null)
+  const undoTimerRef = useRef(null)
 
   function handleCreate({ title, description }) {
     const task = {
@@ -37,6 +42,44 @@ function App() {
     )
   }
 
+  useEffect(() => {
+    return () => {
+      if (undoTimerRef.current) {
+        clearTimeout(undoTimerRef.current)
+      }
+    }
+  }, [])
+
+  function clearUndoTimer() {
+    if (undoTimerRef.current) {
+      clearTimeout(undoTimerRef.current)
+      undoTimerRef.current = null
+    }
+  }
+
+  function handleDeleteTask(taskId) {
+    const task = tasks.find((t) => t.id === taskId)
+    if (!task) return
+    const label = task.title || 'this task'
+    if (!window.confirm(`Delete “${label}”? This can be undone for a few seconds.`)) {
+      return
+    }
+    setTasks((prev) => prev.filter((t) => t.id !== taskId))
+    setDeletedForUndo({ task })
+    clearUndoTimer()
+    undoTimerRef.current = setTimeout(() => {
+      setDeletedForUndo(null)
+      undoTimerRef.current = null
+    }, UNDO_MS)
+  }
+
+  function handleUndoDelete() {
+    if (!deletedForUndo) return
+    setTasks((prev) => [...prev, deletedForUndo.task])
+    setDeletedForUndo(null)
+    clearUndoTimer()
+  }
+
   return (
     <div className="app">
       <header className="app-header">
@@ -61,7 +104,20 @@ function App() {
         onCreateTask={handleCreate}
         onMoveTask={handleMove}
         onUpdateTask={handleUpdate}
+        onDeleteTask={handleDeleteTask}
       />
+      {deletedForUndo && (
+        <div className="undo-toast" role="status">
+          <span className="undo-toast-message">Task deleted</span>
+          <button
+            type="button"
+            className="btn btn-undo"
+            onClick={handleUndoDelete}
+          >
+            Undo
+          </button>
+        </div>
+      )}
     </div>
   )
 }

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   DndContext,
   DragOverlay,
@@ -14,10 +14,16 @@ import Column from './Column'
 import TaskForm from './TaskForm'
 import Card, { CardContent } from './Card'
 
-export default function Board({ tasks, onCreateTask, onMoveTask, onUpdateTask }) {
+export default function Board({ tasks, onCreateTask, onMoveTask, onUpdateTask, onDeleteTask }) {
   const [showForm, setShowForm] = useState(false)
   const [editingTaskId, setEditingTaskId] = useState(null)
   const [activeId, setActiveId] = useState(null)
+
+  useEffect(() => {
+    if (editingTaskId && !tasks.some((t) => t.id === editingTaskId)) {
+      setEditingTaskId(null)
+    }
+  }, [tasks, editingTaskId])
 
   const activeTask = activeId ? tasks.find((t) => t.id === activeId) : null
 
@@ -101,13 +107,20 @@ export default function Board({ tasks, onCreateTask, onMoveTask, onUpdateTask })
               tasks={tasks.filter((t) => t.columnId === column.id)}
               onMoveTask={onMoveTask}
               onEditTask={setEditingTaskId}
+              onDeleteTask={onDeleteTask}
             />
           ))}
         </div>
         <DragOverlay dropAnimation={dropAnimation}>
           {activeTask ? (
             <div className="card-overlay-wrapper">
-              <CardContent task={activeTask} onMove={() => {}} onEdit={null} isOverlay />
+              <CardContent
+                task={activeTask}
+                onMove={() => {}}
+                onEdit={null}
+                onDelete={null}
+                isOverlay
+              />
             </div>
           ) : null}
         </DragOverlay>
