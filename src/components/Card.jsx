@@ -2,14 +2,22 @@ import { useState } from 'react'
 import { useDraggable } from '@dnd-kit/core'
 import { COLUMNS } from '../data/columns'
 
-function CardContent({ task, onMove, onEdit, onDelete, isOverlay = false }) {
+function CardContent({ task, epics = [], onMove, onEdit, onDelete, isOverlay = false }) {
   const [showMoveMenu, setShowMoveMenu] = useState(false)
   const otherColumns = COLUMNS.filter((c) => c.id !== task.columnId)
+  const epic = task.epicId ? epics.find((e) => e.id === task.epicId) : null
 
   return (
     <div className={`card ${isOverlay ? 'card--overlay' : ''}`}>
       <div className="card-header">
-        <h3 className="card-title">{task.title}</h3>
+        <div className="card-title-block">
+          <h3 className="card-title">{task.title}</h3>
+          {epic ? (
+            <span className="epic-badge">{epic.name}</span>
+          ) : task.epicId ? (
+            <span className="epic-badge epic-badge--unknown">Unknown epic</span>
+          ) : null}
+        </div>
         {!isOverlay && (
           <div className="card-actions">
             {otherColumns.length > 0 && (
@@ -86,7 +94,7 @@ function CardContent({ task, onMove, onEdit, onDelete, isOverlay = false }) {
   )
 }
 
-export default function Card({ task, onMove, onEdit, onDelete }) {
+export default function Card({ task, epics, onMove, onEdit, onDelete }) {
   const {
     attributes,
     listeners,
@@ -104,7 +112,13 @@ export default function Card({ task, onMove, onEdit, onDelete }) {
       {...attributes}
       {...listeners}
     >
-      <CardContent task={task} onMove={onMove} onEdit={onEdit} onDelete={onDelete} />
+      <CardContent
+        task={task}
+        epics={epics}
+        onMove={onMove}
+        onEdit={onEdit}
+        onDelete={onDelete}
+      />
     </div>
   )
 }

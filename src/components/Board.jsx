@@ -14,7 +14,14 @@ import Column from './Column'
 import TaskForm from './TaskForm'
 import Card, { CardContent } from './Card'
 
-export default function Board({ tasks, onCreateTask, onMoveTask, onUpdateTask, onDeleteTask }) {
+export default function Board({
+  tasks,
+  epics,
+  onCreateTask,
+  onMoveTask,
+  onUpdateTask,
+  onDeleteTask,
+}) {
   const [showForm, setShowForm] = useState(false)
   const [editingTaskId, setEditingTaskId] = useState(null)
   const [activeId, setActiveId] = useState(null)
@@ -69,6 +76,7 @@ export default function Board({ tasks, onCreateTask, onMoveTask, onUpdateTask, o
         <div className="board-form-overlay">
           <div className="board-form-panel">
             <TaskForm
+              epics={epics}
               onSubmit={(data) => {
                 onCreateTask(data)
                 setShowForm(false)
@@ -82,6 +90,7 @@ export default function Board({ tasks, onCreateTask, onMoveTask, onUpdateTask, o
         <div className="board-form-overlay">
           <div className="board-form-panel">
             <TaskForm
+              epics={epics}
               initialTask={tasks.find((t) => t.id === editingTaskId)}
               onSubmit={(data) => {
                 onUpdateTask(editingTaskId, data)
@@ -105,6 +114,7 @@ export default function Board({ tasks, onCreateTask, onMoveTask, onUpdateTask, o
               columnId={column.id}
               title={column.title}
               tasks={tasks.filter((t) => t.columnId === column.id)}
+              epics={epics}
               onMoveTask={onMoveTask}
               onEditTask={setEditingTaskId}
               onDeleteTask={onDeleteTask}
@@ -116,6 +126,7 @@ export default function Board({ tasks, onCreateTask, onMoveTask, onUpdateTask, o
             <div className="card-overlay-wrapper">
               <CardContent
                 task={activeTask}
+                epics={epics}
                 onMove={() => {}}
                 onEdit={null}
                 onDelete={null}

@@ -5,6 +5,7 @@ export default function Column({
   columnId,
   title,
   tasks,
+  epics,
   onMoveTask,
   onEditTask,
   onDeleteTask,
@@ -19,6 +20,7 @@ export default function Column({
           <Card
             key={task.id}
             task={task}
+            epics={epics}
             onMove={onMoveTask}
             onEdit={onEditTask}
             onDelete={onDeleteTask}
