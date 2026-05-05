@@ -75,6 +75,9 @@ export default function AppLayout({ theme, onToggleTheme }) {
           <NavLink to="/epics" className="sidebar-link">
             Epics
           </NavLink>
+          <NavLink to="/templates" className="sidebar-link">
+            Templates
+          </NavLink>
         </nav>
       </aside>
       <div

@@ -15,7 +15,11 @@ export function useTheme() {
 
   useLayoutEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
-    localStorage.setItem(STORAGE_KEY, theme)
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(STORAGE_KEY, theme)
+      }
+    } catch (_) {}
   }, [theme])
 
   function toggleTheme() {

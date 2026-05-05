@@ -2,14 +2,35 @@ import { useRef, useState, useEffect } from 'react'
 import { Routes, Route } from 'react-router-dom'
 import { useLocalStorage } from './hooks/useLocalStorage'
 import { useEpicsStorage } from './hooks/useEpicsStorage'
+import { useTemplatesStorage } from './hooks/useTemplatesStorage'
 import { useTheme } from './hooks/useTheme'
 import AppLayout from './components/AppLayout'
 import Board from './components/Board'
 import EpicsPage from './pages/EpicsPage'
 import EpicDetailPage from './pages/EpicDetailPage'
+import TemplatesPage from './pages/TemplatesPage'
+import { COLUMN_IDS } from './data/columns'
+import {
+  TASK_TYPE_SET,
+  PRIORITY_SET,
+  DEFAULT_TASK_TYPE,
+  DEFAULT_PRIORITY,
+} from './data/taskMetadata'
 import './App.css'
 
 const UNDO_MS = 5000
+
+function resolveTaskType(incoming, current) {
+  if (incoming === undefined) return current
+  if (TASK_TYPE_SET.has(incoming)) return incoming
+  return current
+}
+
+function resolvePriority(incoming, current) {
+  if (incoming === undefined) return current
+  if (PRIORITY_SET.has(incoming)) return incoming
+  return current
+}
 
 function resolveEpicId(epicId, epics) {
   if (epicId == null || epicId === '') return null
@@ -27,84 +48,300 @@ function reorderById(items, fromId, toId) {
   return next
 }
 
+/** Next append order for a column (max + 1). */
+function getNextOrderForColumn(tasks, columnId) {
+  const inCol = tasks.filter((t) => t.columnId === columnId)
+  if (inCol.length === 0) return 0
+  let max = -1
+  for (const t of inCol) {
+    const o = Number(t.order)
+    if (Number.isFinite(o) && o > max) max = o
+  }
+  return max + 1
+}
+
+/** Reassign sequential `order` (0..n-1) per column; bump `updatedAt` when order changes. */
+function normaliseColumnOrders(tasks, columnIds, now) {
+  const colSet = new Set(columnIds)
+  let result = tasks.map((t) => ({ ...t }))
+
+  for (const col of colSet) {
+    const inCol = result
+      .filter((t) => t.columnId === col)
+      .sort(
+        (a, b) =>
+          (Number(a.order) || 0) - (Number(b.order) || 0) ||
+          String(a.id).localeCompare(String(b.id))
+      )
+    const newOrderById = new Map(inCol.map((t, i) => [t.id, i]))
+    result = result.map((t) => {
+      if (t.columnId !== col) return t
+      const ord = newOrderById.get(t.id)
+      if (ord === undefined) return t
+      if (t.order === ord) return t
+      return { ...t, order: ord, updatedAt: now }
+    })
+  }
+
+  return result
+}
+
+/**
+ * Move active task before target task (same column) or into target column (append / insert).
+ * @param {Set<string>} columnIdSet
+ */
+function repositionTask(tasks, activeTaskId, overId, columnIdSet, now) {
+  if (!activeTaskId || activeTaskId === overId) return tasks
+
+  const active = tasks.find((t) => t.id === activeTaskId)
+  if (!active) return tasks
+
+  const isColumn = columnIdSet.has(overId)
+  const overTask = !isColumn ? tasks.find((t) => t.id === overId) : null
+  if (!isColumn && !overTask) return tasks
+
+  const oldCol = active.columnId
+  const targetCol = isColumn ? overId : overTask.columnId
+
+  const withoutActive = tasks.filter((t) => t.id !== activeTaskId)
+  const colTasks = withoutActive
+    .filter((t) => t.columnId === targetCol)
+    .sort(
+      (a, b) =>
+        (Number(a.order) || 0) - (Number(b.order) || 0) ||
+        String(a.id).localeCompare(String(b.id))
+    )
+
+  let insertAt
+  if (isColumn) {
+    insertAt = colTasks.length
+  } else {
+    const i = colTasks.findIndex((t) => t.id === overId)
+    insertAt = i < 0 ? colTasks.length : i
+  }
+
+  const moved = { ...active, columnId: targetCol, updatedAt: now }
+  const mergedCol = [...colTasks.slice(0, insertAt), moved, ...colTasks.slice(insertAt)].map(
+    (t, idx) => ({
+      ...t,
+      columnId: targetCol,
+      order: idx,
+      updatedAt: now,
+    })
+  )
+
+  const rest = withoutActive.filter((t) => t.columnId !== targetCol)
+  let next = [...rest, ...mergedCol]
+
+  const cols = new Set([targetCol])
+  if (oldCol !== targetCol) cols.add(oldCol)
+  next = normaliseColumnOrders(next, [...cols], now)
+  return next
+}
+
 function App() {
   const [tasks, setTasks] = useLocalStorage()
   const [epics, setEpics] = useEpicsStorage()
+  const [templates, setTemplates] = useTemplatesStorage()
   const [theme, toggleTheme] = useTheme()
   const [deletedForUndo, setDeletedForUndo] = useState(null)
   const undoTimerRef = useRef(null)
 
   function handleCreate(data) {
+    const trimmed = (data.title || '').trim()
+    if (!trimmed) return false
     const epicId = resolveEpicId(data.epicId, epics)
-    const task = {
-      id: crypto.randomUUID(),
-      title: data.title.trim() || 'Untitled',
-      description: (data.description || '').trim(),
-      columnId: 'backlog',
-      epicId,
-    }
-    setTasks((prev) => [...prev, task])
+    const now = new Date().toISOString()
+    setTasks((prev) => {
+      const order = getNextOrderForColumn(prev, 'backlog')
+      const taskType = TASK_TYPE_SET.has(data.taskType)
+        ? data.taskType
+        : DEFAULT_TASK_TYPE
+      const priority = PRIORITY_SET.has(data.priority)
+        ? data.priority
+        : DEFAULT_PRIORITY
+      const dueDate =
+        typeof data.dueDate === 'string' ? data.dueDate : ''
+      const owner = (data.owner || '').trim()
+      const task = {
+        id: crypto.randomUUID(),
+        title: trimmed,
+        description: (data.description || '').trim(),
+        columnId: 'backlog',
+        epicId,
+        createdAt: now,
+        updatedAt: now,
+        order,
+        taskType,
+        priority,
+        dueDate,
+        owner,
+      }
+      return [...prev, task]
+    })
+    return true
   }
 
-  function handleMove(taskId, newColumnId) {
-    setTasks((prev) =>
-      prev.map((t) => (t.id === taskId ? { ...t, columnId: newColumnId } : t))
-    )
+  function handleRepositionTask(activeTaskId, overId) {
+    setTasks((prev) => {
+      const now = new Date().toISOString()
+      return repositionTask(prev, activeTaskId, overId, COLUMN_IDS, now)
+    })
   }
 
-  function handleUpdate(taskId, { title, description, epicId }) {
+  function handleUpdate(
+    taskId,
+    { title, description, epicId, taskType, priority, dueDate, owner }
+  ) {
     const nextEpicId = resolveEpicId(epicId, epics)
+    const now = new Date().toISOString()
+    let didUpdate = false
     setTasks((prev) =>
-      prev.map((t) =>
-        t.id === taskId
-          ? {
-              ...t,
-              title: (title ?? t.title).trim() || 'Untitled',
-              description: (description ?? t.description ?? '').trim(),
-              epicId:
-                epicId === '' || epicId === null || epicId === undefined
-                  ? null
-                  : nextEpicId,
-            }
-          : t
-      )
+      prev.map((t) => {
+        if (t.id !== taskId) return t
+        const trimmedTitle = (title ?? t.title).trim()
+        if (!trimmedTitle) return t
+        didUpdate = true
+        const currentType = t.taskType ?? DEFAULT_TASK_TYPE
+        const currentPriority = t.priority ?? DEFAULT_PRIORITY
+        return {
+          ...t,
+          title: trimmedTitle,
+          description: (description ?? t.description ?? '').trim(),
+          epicId:
+            epicId === '' || epicId === null || epicId === undefined
+              ? null
+              : nextEpicId,
+          taskType: resolveTaskType(taskType, currentType),
+          priority: resolvePriority(priority, currentPriority),
+          dueDate:
+            dueDate === undefined
+              ? (t.dueDate ?? '')
+              : String(dueDate ?? ''),
+          owner:
+            owner === undefined ? (t.owner ?? '') : String(owner ?? '').trim(),
+          updatedAt: now,
+        }
+      })
     )
+    return didUpdate
   }
 
   function handleCreateEpic({ name, description }) {
+    const n = (name || '').trim()
+    if (!n) return
+    const now = new Date().toISOString()
     setEpics((prev) => [
       ...prev,
       {
         id: crypto.randomUUID(),
-        name,
-        description: description || '',
+        name: n,
+        description: (description || '').trim(),
+        createdAt: now,
+        updatedAt: now,
       },
     ])
   }
 
   function handleDeleteEpic(epicId) {
+    const now = new Date().toISOString()
     setEpics((prev) => prev.filter((e) => e.id !== epicId))
     setTasks((prev) =>
-      prev.map((t) => (t.epicId === epicId ? { ...t, epicId: null } : t))
+      prev.map((t) =>
+        t.epicId === epicId ? { ...t, epicId: null, updatedAt: now } : t
+      )
     )
   }
 
   function handleUpdateEpic(epicId, { name, description }) {
+    const now = new Date().toISOString()
     setEpics((prev) =>
-      prev.map((epic) =>
-        epic.id === epicId
-          ? {
-              ...epic,
-              name: (name ?? epic.name).trim() || epic.name,
-              description: (description ?? epic.description ?? '').trim(),
-            }
-          : epic
-      )
+      prev.map((epic) => {
+        if (epic.id !== epicId) return epic
+        const trimmedName = (name ?? epic.name).trim()
+        if (!trimmedName) return epic
+        return {
+          ...epic,
+          name: trimmedName,
+          description: (description ?? epic.description ?? '').trim(),
+          updatedAt: now,
+        }
+      })
     )
   }
 
   function handleReorderEpics(fromId, toId) {
     setEpics((prev) => reorderById(prev, fromId, toId))
+  }
+
+  function handleCreateTemplate(data) {
+    const title = (data.title || '').trim()
+    if (!title) return false
+    let label = (data.label || '').trim()
+    if (!label) label = title
+    const now = new Date().toISOString()
+    const taskType = TASK_TYPE_SET.has(data.taskType)
+      ? data.taskType
+      : DEFAULT_TASK_TYPE
+    const priority = PRIORITY_SET.has(data.priority)
+      ? data.priority
+      : DEFAULT_PRIORITY
+    setTemplates((prev) => [
+      ...prev,
+      {
+        id: crypto.randomUUID(),
+        label,
+        title,
+        description: (data.description || '').trim(),
+        taskType,
+        priority,
+        dueDate: typeof data.dueDate === 'string' ? data.dueDate : '',
+        owner: (data.owner || '').trim(),
+        createdAt: now,
+        updatedAt: now,
+      },
+    ])
+    return true
+  }
+
+  function handleUpdateTemplate(templateId, data) {
+    const now = new Date().toISOString()
+    setTemplates((prev) =>
+      prev.map((t) => {
+        if (t.id !== templateId) return t
+        const nextTitle = (data.title ?? t.title).trim()
+        if (!nextTitle) return t
+        let label = (data.label ?? t.label).trim()
+        if (!label) label = nextTitle
+        const taskType = TASK_TYPE_SET.has(data.taskType)
+          ? data.taskType
+          : t.taskType
+        const priority = PRIORITY_SET.has(data.priority)
+          ? data.priority
+          : t.priority
+        return {
+          ...t,
+          label,
+          title: nextTitle,
+          description: (data.description ?? t.description ?? '').trim(),
+          taskType,
+          priority,
+          dueDate:
+            data.dueDate === undefined
+              ? (t.dueDate ?? '')
+              : String(data.dueDate ?? ''),
+          owner:
+            data.owner === undefined
+              ? (t.owner ?? '')
+              : String(data.owner ?? '').trim(),
+          updatedAt: now,
+        }
+      })
+    )
+  }
+
+  function handleDeleteTemplate(templateId) {
+    setTemplates((prev) => prev.filter((t) => t.id !== templateId))
   }
 
   useEffect(() => {
@@ -157,8 +394,9 @@ function App() {
               <Board
                 tasks={tasks}
                 epics={epics}
+                templates={templates}
                 onCreateTask={handleCreate}
-                onMoveTask={handleMove}
+                onRepositionTask={handleRepositionTask}
                 onUpdateTask={handleUpdate}
                 onDeleteTask={handleDeleteTask}
               />
@@ -183,7 +421,18 @@ function App() {
                 epics={epics}
                 tasks={tasks}
                 onUpdateEpic={handleUpdateEpic}
-                onMoveTask={handleMove}
+                onRepositionTask={handleRepositionTask}
+              />
+            }
+          />
+          <Route
+            path="templates"
+            element={
+              <TemplatesPage
+                templates={templates}
+                onCreateTemplate={handleCreateTemplate}
+                onUpdateTemplate={handleUpdateTemplate}
+                onDeleteTemplate={handleDeleteTemplate}
               />
             }
           />

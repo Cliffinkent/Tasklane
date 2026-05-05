@@ -1,16 +1,49 @@
 import { useState } from 'react'
-import { useDraggable } from '@dnd-kit/core'
+import { useDraggable, useDroppable } from '@dnd-kit/core'
 import { COLUMNS } from '../data/columns'
+
+function priorityVariant(priority) {
+  switch (priority) {
+    case 'Low':
+      return 'low'
+    case 'High':
+      return 'high'
+    case 'Critical':
+      return 'critical'
+    default:
+      return 'medium'
+  }
+}
+
+function formatDueHint(isoDate) {
+  if (!isoDate || typeof isoDate !== 'string' || !isoDate.trim()) return null
+  return isoDate
+}
 
 function CardContent({ task, epics = [], onMove, onEdit, onDelete, isOverlay = false }) {
   const [showMoveMenu, setShowMoveMenu] = useState(false)
   const otherColumns = COLUMNS.filter((c) => c.id !== task.columnId)
   const epic = task.epicId ? epics.find((e) => e.id === task.epicId) : null
 
+  const taskTypeLabel = task.taskType || 'Discovery'
+  const priorityLabel = task.priority || 'Medium'
+  const dueStr = formatDueHint(task.dueDate)
+  const ownerStr = typeof task.owner === 'string' && task.owner.trim() ? task.owner.trim() : null
+
   return (
-    <div className={`card ${isOverlay ? 'card--overlay' : ''}`}>
+    <div
+      className={`card ${isOverlay ? 'card--overlay' : 'card--interactive'}`}
+    >
       <div className="card-header">
         <div className="card-title-block">
+          <div className="card-badges">
+            <span className="task-type-badge">{taskTypeLabel}</span>
+            <span
+              className={`priority-badge priority-badge--${priorityVariant(priorityLabel)}`}
+            >
+              {priorityLabel}
+            </span>
+          </div>
           <h3 className="card-title">{task.title}</h3>
           {epic ? (
             <span className="epic-badge">{epic.name}</span>
@@ -90,6 +123,20 @@ function CardContent({ task, epics = [], onMove, onEdit, onDelete, isOverlay = f
       {task.description && (
         <p className="card-description">{task.description}</p>
       )}
+      {dueStr || ownerStr ? (
+        <div className="card-meta">
+          {dueStr ? (
+            <span className="card-meta-item card-meta-item--due">
+              <span className="card-meta-label">Due</span> {dueStr}
+            </span>
+          ) : null}
+          {ownerStr ? (
+            <span className="card-meta-item card-meta-item--owner">
+              <span className="card-meta-label">Owner</span> {ownerStr}
+            </span>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   )
 }
@@ -98,17 +145,27 @@ export default function Card({ task, epics, onMove, onEdit, onDelete }) {
   const {
     attributes,
     listeners,
-    setNodeRef,
+    setNodeRef: setDragRef,
     isDragging,
   } = useDraggable({
     id: task.id,
-    data: { task, columnId: task.columnId },
+    data: { type: 'task', task, columnId: task.columnId },
   })
+
+  const { setNodeRef: setDropRef, isOver } = useDroppable({
+    id: `drop:${task.id}`,
+    data: { type: 'task', task, columnId: task.columnId },
+  })
+
+  function setRefs(node) {
+    setDragRef(node)
+    setDropRef(node)
+  }
 
   return (
     <div
-      ref={setNodeRef}
-      className={`card-wrapper ${isDragging ? 'card-wrapper--dragging' : ''}`}
+      ref={setRefs}
+      className={`card-wrapper ${isDragging ? 'card-wrapper--dragging' : ''} ${isOver && !isDragging ? 'card-wrapper--drop-target' : ''}`}
       {...attributes}
       {...listeners}
     >

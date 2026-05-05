@@ -4,3 +4,5 @@ export const COLUMNS = [
   { id: 'blocked', title: 'Blocked' },
   { id: 'done', title: 'Done' },
 ]
+
+export const COLUMN_IDS = new Set(COLUMNS.map((c) => c.id))

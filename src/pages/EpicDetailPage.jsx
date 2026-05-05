@@ -2,7 +2,30 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { COLUMNS } from '../data/columns'
 
-export default function EpicDetailPage({ epics, tasks, onUpdateEpic, onMoveTask }) {
+const columnRank = (() => {
+  const m = new Map(COLUMNS.map((c, i) => [c.id, i]))
+  return (columnId) => m.get(columnId) ?? 999
+})()
+
+function priorityVariant(priority) {
+  switch (priority) {
+    case 'Low':
+      return 'low'
+    case 'High':
+      return 'high'
+    case 'Critical':
+      return 'critical'
+    default:
+      return 'medium'
+  }
+}
+
+export default function EpicDetailPage({
+  epics,
+  tasks,
+  onUpdateEpic,
+  onRepositionTask,
+}) {
   const { epicId } = useParams()
   const epic = epics.find((e) => e.id === epicId)
   const [name, setName] = useState(epic?.name ?? '')
@@ -13,10 +36,16 @@ export default function EpicDetailPage({ epics, tasks, onUpdateEpic, onMoveTask 
     setDescription(epic?.description ?? '')
   }, [epic])
 
-  const linkedTasks = useMemo(
-    () => tasks.filter((task) => task.epicId === epicId),
-    [tasks, epicId]
-  )
+  const linkedTasks = useMemo(() => {
+    const list = tasks.filter((task) => task.epicId === epicId)
+    return [...list].sort((a, b) => {
+      const cr = columnRank(a.columnId) - columnRank(b.columnId)
+      if (cr !== 0) return cr
+      const o = (Number(a.order) || 0) - (Number(b.order) || 0)
+      if (o !== 0) return o
+      return String(a.id).localeCompare(String(b.id))
+    })
+  }, [tasks, epicId])
 
   if (!epic) {
     return (
@@ -85,12 +114,45 @@ export default function EpicDetailPage({ epics, tasks, onUpdateEpic, onMoveTask 
           <p className="epics-empty">No tasks are linked to this epic yet.</p>
         ) : (
           <ul className="epic-task-list">
-            {linkedTasks.map((task) => (
+            {linkedTasks.map((task) => {
+              const dueStr =
+                typeof task.dueDate === 'string' && task.dueDate.trim()
+                  ? task.dueDate.trim()
+                  : null
+              const ownerStr =
+                typeof task.owner === 'string' && task.owner.trim()
+                  ? task.owner.trim()
+                  : null
+              return (
               <li key={task.id} className="epic-task-item">
                 <div className="epic-task-body">
+                  <div className="card-badges epic-detail-badges">
+                    <span className="task-type-badge">
+                      {task.taskType ?? 'Discovery'}
+                    </span>
+                    <span
+                      className={`priority-badge priority-badge--${priorityVariant(task.priority ?? 'Medium')}`}
+                    >
+                      {task.priority ?? 'Medium'}
+                    </span>
+                  </div>
                   <p className="epic-task-title">{task.title}</p>
                   {task.description ? (
                     <p className="epic-task-description">{task.description}</p>
+                  ) : null}
+                  {dueStr || ownerStr ? (
+                    <div className="card-meta epic-task-inline-meta">
+                      {dueStr ? (
+                        <span className="card-meta-item card-meta-item--due">
+                          <span className="card-meta-label">Due</span> {dueStr}
+                        </span>
+                      ) : null}
+                      {ownerStr ? (
+                        <span className="card-meta-item card-meta-item--owner">
+                          <span className="card-meta-label">Owner</span> {ownerStr}
+                        </span>
+                      ) : null}
+                    </div>
                   ) : null}
                 </div>
                 <label className="epic-task-status">
@@ -98,7 +160,9 @@ export default function EpicDetailPage({ epics, tasks, onUpdateEpic, onMoveTask 
                   <select
                     className="task-form-select"
                     value={task.columnId}
-                    onChange={(e) => onMoveTask(task.id, e.target.value)}
+                    onChange={(e) =>
+                      onRepositionTask(task.id, e.target.value)
+                    }
                   >
                     {COLUMNS.map((column) => (
                       <option key={column.id} value={column.id}>
@@ -108,7 +172,8 @@ export default function EpicDetailPage({ epics, tasks, onUpdateEpic, onMoveTask 
                   </select>
                 </label>
               </li>
-            ))}
+              )
+            })}
           </ul>
         )}
       </section>
