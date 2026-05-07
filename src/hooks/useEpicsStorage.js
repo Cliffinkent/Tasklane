@@ -42,7 +42,10 @@ function getStored() {
     if (!raw) return []
     const parsed = JSON.parse(raw)
     if (!Array.isArray(parsed)) return []
-    return parsed.map(normalizeStoredEpic).filter(Boolean)
+    return parsed
+      .filter((item) => item && typeof item === 'object')
+      .map(normalizeStoredEpic)
+      .filter(Boolean)
   } catch (_) {
     return []
   }

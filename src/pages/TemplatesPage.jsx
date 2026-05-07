@@ -1,5 +1,11 @@
-import { useState } from 'react'
-import { TASK_TYPES, PRIORITIES } from '../data/taskMetadata'
+import { useState, useEffect } from 'react'
+import {
+  TASK_TYPES,
+  PRIORITIES,
+  normaliseTaskType,
+  DEFAULT_TASK_TYPE,
+} from '../data/taskMetadata'
+import { formatDateLabel } from '../utils/formatDateLabel'
 
 function priorityVariant(p) {
   switch (p) {
@@ -53,7 +59,7 @@ function CreateTemplateForm({ onCreate }) {
 
   return (
     <form className="template-form" onSubmit={handleSubmit} noValidate>
-      <h3 className="epic-form-heading">New template</h3>
+      <h3 className="surface-form-heading">New template</h3>
       <div className="template-form-grid">
         <div className="template-form-field">
           <label className="task-form-label task-form-label--block" htmlFor="tpl-create-label">
@@ -68,7 +74,7 @@ function CreateTemplateForm({ onCreate }) {
             placeholder="Short name in lists"
           />
         </div>
-        <div className="template-form-field template-form-field--full">
+        <div className="template-form-field">
           <label className="task-form-label task-form-label--block" htmlFor="tpl-create-title">
             Task title
           </label>
@@ -163,7 +169,7 @@ function CreateTemplateForm({ onCreate }) {
           />
         </div>
       </div>
-      <div className="task-form-actions">
+      <div className="template-form-actions">
         <button type="submit" className="btn btn-primary">
           Create template
         </button>
@@ -176,13 +182,26 @@ function InlineEditTemplate({ template, onSave, onCancel }) {
   const [label, setLabel] = useState(template.label ?? '')
   const [title, setTitle] = useState(template.title ?? '')
   const [description, setDescription] = useState(template.description ?? '')
-  const [taskType, setTaskType] = useState(template.taskType ?? 'Discovery')
+  const [taskType, setTaskType] = useState(() =>
+    normaliseTaskType(template.taskType ?? '', DEFAULT_TASK_TYPE)
+  )
   const [priority, setPriority] = useState(template.priority ?? 'Medium')
   const [dueDate, setDueDate] = useState(
     typeof template.dueDate === 'string' ? template.dueDate : ''
   )
   const [owner, setOwner] = useState(template.owner ?? '')
   const [titleError, setTitleError] = useState(false)
+
+  useEffect(() => {
+    setLabel(template.label ?? '')
+    setTitle(template.title ?? '')
+    setDescription(template.description ?? '')
+    setTaskType(normaliseTaskType(template.taskType ?? '', DEFAULT_TASK_TYPE))
+    setPriority(template.priority ?? 'Medium')
+    setDueDate(typeof template.dueDate === 'string' ? template.dueDate : '')
+    setOwner(template.owner ?? '')
+    setTitleError(false)
+  }, [template])
 
   function handleSubmit(e) {
     e.preventDefault()
@@ -220,7 +239,7 @@ function InlineEditTemplate({ template, onSave, onCancel }) {
               onChange={(e) => setLabel(e.target.value)}
             />
           </div>
-          <div className="template-form-field template-form-field--full">
+          <div className="template-form-field">
             <label className="task-form-label task-form-label--block" htmlFor={`edit-title-${template.id}`}>
               Task title
             </label>
@@ -313,7 +332,7 @@ function InlineEditTemplate({ template, onSave, onCancel }) {
             />
           </div>
         </div>
-        <div className="task-form-actions">
+        <div className="template-form-actions">
           <button type="submit" className="btn btn-primary">
             Save
           </button>
@@ -337,7 +356,7 @@ export default function TemplatesPage({
   function handleDelete(template) {
     if (
       window.confirm(
-        `Delete template “${template.label || template.title}”? This does not remove tasks already created from it.`
+        `Delete template “${template.label || template.title}”? Existing tasks created from this template will not be affected.`
       )
     ) {
       onDeleteTemplate(template.id)
@@ -347,24 +366,27 @@ export default function TemplatesPage({
 
   return (
     <div className="templates-page">
-      <div className="templates-page-intro">
-        <h2 className="templates-page-title">Templates</h2>
-        <p className="templates-page-desc">
-          Create and manage reusable migration task templates.
-        </p>
-      </div>
-
       <CreateTemplateForm onCreate={onCreateTemplate} />
 
       <section className="template-list-section" aria-labelledby="template-list-heading">
-        <h3 id="template-list-heading" className="epic-form-heading">
+        <h3 id="template-list-heading" className="page-section-heading">
           All templates ({templates.length})
         </h3>
         {templates.length === 0 ? (
-          <p className="template-empty">No templates yet. Create one above.</p>
+          <div className="empty-state" role="status">
+            <div className="empty-state-inner">
+              <div className="empty-state-panel">
+                <p className="empty-state-message">
+                  No templates yet. Create one to reuse common task patterns.
+                </p>
+              </div>
+            </div>
+          </div>
         ) : (
           <ul className="template-list">
-            {templates.map((tpl) => (
+            {templates.map((tpl) => {
+              const dueLabel = formatDateLabel(tpl.dueDate)
+              return (
               <li key={tpl.id} className="template-list-item">
                 {editingId === tpl.id ? (
                   <InlineEditTemplate
@@ -380,7 +402,12 @@ export default function TemplatesPage({
                     <div className="template-list-header">
                       <div className="template-list-title-block">
                         <div className="card-badges template-list-badges">
-                          <span className="task-type-badge">{tpl.taskType}</span>
+                          <span className="task-type-badge">
+                            {normaliseTaskType(
+                              tpl.taskType ?? '',
+                              DEFAULT_TASK_TYPE
+                            )}
+                          </span>
                           <span
                             className={`priority-badge priority-badge--${priorityVariant(tpl.priority)}`}
                           >
@@ -393,9 +420,9 @@ export default function TemplatesPage({
                           <p className="template-list-desc">{tpl.description}</p>
                         ) : null}
                         <div className="template-list-meta">
-                          {tpl.dueDate ? (
+                          {dueLabel ? (
                             <span className="card-meta-item">
-                              <span className="card-meta-label">Due</span> {tpl.dueDate}
+                              <span className="card-meta-label">Due</span> {dueLabel}
                             </span>
                           ) : null}
                           {tpl.owner ? (
@@ -415,7 +442,7 @@ export default function TemplatesPage({
                         </button>
                         <button
                           type="button"
-                          className="btn btn-ghost"
+                          className="btn btn-ghost btn--danger-quiet"
                           onClick={() => handleDelete(tpl)}
                         >
                           Delete
@@ -425,7 +452,8 @@ export default function TemplatesPage({
                   </>
                 )}
               </li>
-            ))}
+              )
+            })}
           </ul>
         )}
       </section>

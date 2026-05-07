@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react'
-import { TASK_TYPE_SET, PRIORITY_SET, MIGRATION_TASK_TEMPLATES } from '../data/taskMetadata'
+import {
+  normaliseTaskType,
+  PRIORITY_SET,
+  TASK_TEMPLATES,
+  DEFAULT_PRIORITY,
+} from '../data/taskMetadata'
 
 const STORAGE_KEY = 'kanban-task-templates'
-
-const DEFAULT_TASK_TYPE = 'Discovery'
-const DEFAULT_PRIORITY = 'Medium'
 
 function nowIso() {
   return new Date().toISOString()
@@ -19,7 +21,7 @@ function parseIsoOrNow(v) {
 /** Full seed list with timestamps (built-in ids preserved). */
 export function getSeedTemplates() {
   const now = nowIso()
-  return MIGRATION_TASK_TEMPLATES.map((t) => ({
+  return TASK_TEMPLATES.map((t) => ({
     ...t,
     dueDate: typeof t.dueDate === 'string' ? t.dueDate : '',
     owner: typeof t.owner === 'string' ? t.owner : '',
@@ -38,17 +40,16 @@ export function normaliseTemplate(t) {
   if (!title) title = label
   if (!label) label = title
 
-  const taskType =
-    typeof t.taskType === 'string' && TASK_TYPE_SET.has(t.taskType)
-      ? t.taskType
-      : DEFAULT_TASK_TYPE
+  const taskType = normaliseTaskType(
+    typeof t.taskType === 'string' ? t.taskType : ''
+  )
   const priority =
     typeof t.priority === 'string' && PRIORITY_SET.has(t.priority)
       ? t.priority
       : DEFAULT_PRIORITY
 
   const description = String(t.description ?? '').trim()
-  const dueDate = typeof t.dueDate === 'string' ? t.dueDate : ''
+  const dueDate = typeof t.dueDate === 'string' ? t.dueDate.trim() : ''
   const owner = String(t.owner ?? '').trim()
 
   const createdAt = parseIsoOrNow(t.createdAt)
@@ -80,15 +81,15 @@ function getStored() {
       return getSeedTemplates()
     }
     const parsed = JSON.parse(raw)
-    if (!Array.isArray(parsed)) return getSeedTemplates()
+    if (!Array.isArray(parsed)) return []
     if (parsed.length === 0) return []
-    const normalised = parsed.map(normaliseTemplate).filter(Boolean)
-    if (normalised.length === 0 && parsed.length > 0) {
-      return getSeedTemplates()
-    }
+    const normalised = parsed
+      .filter((item) => item && typeof item === 'object')
+      .map(normaliseTemplate)
+      .filter(Boolean)
     return normalised
   } catch (_) {
-    return getSeedTemplates()
+    return []
   }
 }
 

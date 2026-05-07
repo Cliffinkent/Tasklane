@@ -11,9 +11,8 @@ import EpicDetailPage from './pages/EpicDetailPage'
 import TemplatesPage from './pages/TemplatesPage'
 import { COLUMN_IDS } from './data/columns'
 import {
-  TASK_TYPE_SET,
+  normaliseTaskType,
   PRIORITY_SET,
-  DEFAULT_TASK_TYPE,
   DEFAULT_PRIORITY,
 } from './data/taskMetadata'
 import './App.css'
@@ -21,9 +20,14 @@ import './App.css'
 const UNDO_MS = 5000
 
 function resolveTaskType(incoming, current) {
-  if (incoming === undefined) return current
-  if (TASK_TYPE_SET.has(incoming)) return incoming
-  return current
+  const currentNorm = normaliseTaskType(
+    typeof current === 'string' ? current : ''
+  )
+  if (incoming === undefined) return currentNorm
+  return normaliseTaskType(
+    typeof incoming === 'string' ? incoming : '',
+    currentNorm
+  )
 }
 
 function resolvePriority(incoming, current) {
@@ -154,9 +158,9 @@ function App() {
     const now = new Date().toISOString()
     setTasks((prev) => {
       const order = getNextOrderForColumn(prev, 'backlog')
-      const taskType = TASK_TYPE_SET.has(data.taskType)
-        ? data.taskType
-        : DEFAULT_TASK_TYPE
+      const taskType = normaliseTaskType(
+        typeof data.taskType === 'string' ? data.taskType : ''
+      )
       const priority = PRIORITY_SET.has(data.priority)
         ? data.priority
         : DEFAULT_PRIORITY
@@ -202,7 +206,6 @@ function App() {
         const trimmedTitle = (title ?? t.title).trim()
         if (!trimmedTitle) return t
         didUpdate = true
-        const currentType = t.taskType ?? DEFAULT_TASK_TYPE
         const currentPriority = t.priority ?? DEFAULT_PRIORITY
         return {
           ...t,
@@ -212,7 +215,7 @@ function App() {
             epicId === '' || epicId === null || epicId === undefined
               ? null
               : nextEpicId,
-          taskType: resolveTaskType(taskType, currentType),
+          taskType: resolveTaskType(taskType, t.taskType),
           priority: resolvePriority(priority, currentPriority),
           dueDate:
             dueDate === undefined
@@ -280,9 +283,9 @@ function App() {
     let label = (data.label || '').trim()
     if (!label) label = title
     const now = new Date().toISOString()
-    const taskType = TASK_TYPE_SET.has(data.taskType)
-      ? data.taskType
-      : DEFAULT_TASK_TYPE
+    const taskType = normaliseTaskType(
+      typeof data.taskType === 'string' ? data.taskType : ''
+    )
     const priority = PRIORITY_SET.has(data.priority)
       ? data.priority
       : DEFAULT_PRIORITY
@@ -313,9 +316,13 @@ function App() {
         if (!nextTitle) return t
         let label = (data.label ?? t.label).trim()
         if (!label) label = nextTitle
-        const taskType = TASK_TYPE_SET.has(data.taskType)
-          ? data.taskType
-          : t.taskType
+        const priorType = normaliseTaskType(
+          typeof t.taskType === 'string' ? t.taskType : ''
+        )
+        const taskType = normaliseTaskType(
+          typeof data.taskType === 'string' ? data.taskType : priorType,
+          priorType
+        )
         const priority = PRIORITY_SET.has(data.priority)
           ? data.priority
           : t.priority
@@ -363,7 +370,11 @@ function App() {
     const task = tasks.find((t) => t.id === taskId)
     if (!task) return
     const label = task.title || 'this task'
-    if (!window.confirm(`Delete “${label}”? This can be undone for a few seconds.`)) {
+    if (
+      !window.confirm(
+        `Delete “${label}”? You can undo this for a few seconds.`
+      )
+    ) {
       return
     }
     setTasks((prev) => prev.filter((t) => t.id !== taskId))

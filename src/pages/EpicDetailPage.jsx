@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { COLUMNS } from '../data/columns'
+import { normaliseTaskType, DEFAULT_TASK_TYPE } from '../data/taskMetadata'
+import { formatDateLabel } from '../utils/formatDateLabel'
 
 const columnRank = (() => {
   const m = new Map(COLUMNS.map((c, i) => [c.id, i]))
@@ -30,10 +32,12 @@ export default function EpicDetailPage({
   const epic = epics.find((e) => e.id === epicId)
   const [name, setName] = useState(epic?.name ?? '')
   const [description, setDescription] = useState(epic?.description ?? '')
+  const [nameError, setNameError] = useState(false)
 
   useEffect(() => {
     setName(epic?.name ?? '')
     setDescription(epic?.description ?? '')
+    setNameError(false)
   }, [epic])
 
   const linkedTasks = useMemo(() => {
@@ -64,7 +68,11 @@ export default function EpicDetailPage({
   function handleSave(e) {
     e.preventDefault()
     const nextName = name.trim()
-    if (!nextName) return
+    if (!nextName) {
+      setNameError(true)
+      return
+    }
+    setNameError(false)
     onUpdateEpic(epic.id, { name: nextName, description: description.trim() })
   }
 
@@ -80,25 +88,54 @@ export default function EpicDetailPage({
         </span>
       </div>
       <p className="epic-detail-subtitle">
-        Quick-edit this epic and update task statuses inline.
+        Update this epic and review linked tasks.
       </p>
 
-      <form className="epic-form epic-detail-edit-form" onSubmit={handleSave}>
-        <h3 className="epic-form-heading">Edit epic</h3>
-        <input
-          type="text"
-          className="task-form-input"
-          placeholder="Epic name"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-        />
-        <textarea
-          className="task-form-textarea"
-          placeholder="Description (optional)"
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          rows={3}
-        />
+      <form className="epic-form epic-detail-edit-form" onSubmit={handleSave} noValidate>
+        <h3 className="surface-form-heading">Edit epic</h3>
+        <div className="template-form-field">
+          <label
+            className="task-form-label task-form-label--block"
+            htmlFor="epic-detail-name"
+          >
+            Epic name
+          </label>
+          <input
+            id="epic-detail-name"
+            type="text"
+            className="task-form-input"
+            placeholder="Epic name"
+            value={name}
+            onChange={(e) => {
+              setName(e.target.value)
+              if (nameError) setNameError(false)
+            }}
+            aria-invalid={nameError}
+            aria-describedby={nameError ? 'epic-detail-name-err' : undefined}
+            autoComplete="off"
+          />
+          {nameError ? (
+            <p id="epic-detail-name-err" className="form-error" role="alert">
+              Epic name is required.
+            </p>
+          ) : null}
+        </div>
+        <div className="template-form-field">
+          <label
+            className="task-form-label task-form-label--block"
+            htmlFor="epic-detail-desc"
+          >
+            Description (optional)
+          </label>
+          <textarea
+            id="epic-detail-desc"
+            className="task-form-textarea"
+            placeholder="Description (optional)"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            rows={3}
+          />
+        </div>
         <div className="task-form-actions">
           <button type="submit" className="btn btn-primary">
             Save epic
@@ -107,18 +144,27 @@ export default function EpicDetailPage({
       </form>
 
       <section className="epic-linked-tasks" aria-labelledby="epic-linked-tasks-heading">
-        <h3 id="epic-linked-tasks-heading" className="epics-list-heading">
+        <h3 id="epic-linked-tasks-heading" className="page-section-heading">
           Linked tasks
         </h3>
         {linkedTasks.length === 0 ? (
-          <p className="epics-empty">No tasks are linked to this epic yet.</p>
+          <div className="empty-state" role="status">
+            <div className="empty-state-inner">
+              <div className="empty-state-panel">
+                <p className="empty-state-message">
+                  No tasks are linked to this epic yet.
+                </p>
+              </div>
+            </div>
+          </div>
         ) : (
           <ul className="epic-task-list">
             {linkedTasks.map((task) => {
-              const dueStr =
+              const dueRaw =
                 typeof task.dueDate === 'string' && task.dueDate.trim()
                   ? task.dueDate.trim()
-                  : null
+                  : ''
+              const dueStr = dueRaw ? formatDateLabel(dueRaw) : null
               const ownerStr =
                 typeof task.owner === 'string' && task.owner.trim()
                   ? task.owner.trim()
@@ -128,7 +174,10 @@ export default function EpicDetailPage({
                 <div className="epic-task-body">
                   <div className="card-badges epic-detail-badges">
                     <span className="task-type-badge">
-                      {task.taskType ?? 'Discovery'}
+                      {normaliseTaskType(
+                        task.taskType ?? '',
+                        DEFAULT_TASK_TYPE
+                      )}
                     </span>
                     <span
                       className={`priority-badge priority-badge--${priorityVariant(task.priority ?? 'Medium')}`}
@@ -141,7 +190,7 @@ export default function EpicDetailPage({
                     <p className="epic-task-description">{task.description}</p>
                   ) : null}
                   {dueStr || ownerStr ? (
-                    <div className="card-meta epic-task-inline-meta">
+                    <div className="card-meta">
                       {dueStr ? (
                         <span className="card-meta-item card-meta-item--due">
                           <span className="card-meta-label">Due</span> {dueStr}

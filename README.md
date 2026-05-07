@@ -1,52 +1,35 @@
-# Kanban Task Manager
+# Tasklane
 
-A browser-based Kanban board built with React and Vite. Tasks are stored locally in your browser (no server required).
+Work in the Tasklane.
+
+A browser-local agile task tracking board built with React and Vite.
+
+**Developer handoff** (routes, data model, `localStorage`, UX decisions, backlog): [`HANDOFF.md`](HANDOFF.md). This README stays user- and operator-focused.
+
+## What this PoC demonstrates
+
+Tasklane demonstrates:
+
+- Agile task tracking with board lanes
+- Epics for grouping related work
+- Reusable task templates
+- Task metadata: type, priority, due date, owner
+- Search and filtering
+- Drag and drop ordering
+- Light and dark themes
+- localStorage persistence
 
 ## Features
 
-- **Board** — Four columns: Backlog, In Progress, Blocked, Done.
-- **Tasks** — Title, description, migration metadata (task type, priority, due date, owner), create/edit/delete (with confirm and short undo).
-- **Ordered cards** — Per-column `order`; drag to reorder within a column or insert before another card; drop on a column appends to the end.
-- **Board filters** — Search (title, description, and owner), column/status, epic, **task type**, and **priority**, with count summary and clear action.
-- **Templates** — Manage reusable migration task templates (create, edit, delete) on `/templates`; list is stored in `localStorage`. Built-in templates seed the first run.
-- **Board quick-create** — “Use template...” dropdown uses your saved templates to open the task form prefilled.
-- **Drag and drop** — Reorder and move cards with `@dnd-kit/core` (column and card drop targets).
-- **Epics** — Create epics, assign tasks to an epic, reorder epics, open an epic detail page with linked tasks and inline status changes.
-- **Theme** — Light / dark mode, persisted per browser.
-- **Layout** — Resizable sidebar navigation.
-- **UI** — Layout, typography, and contrast tuned for handoff readability (still no backend sync, accounts, or production-grade workflow controls).
-
-## Migration workflow PoC
-
-This app is intentionally framed as a **cloud migration workflow** demo, not only a generic board:
-
-- **Lifecycle categories** via task types (Discovery → Assessment → Planning → Migration → Validation → Day 2).
-- **Prioritisation** with Low / Medium / High / Critical on each task.
-- **Lightweight ownership** and optional **due dates** alongside epics and board columns.
-- **Template-driven creation** from user-managed templates (six built-ins seed the first run); edit templates anytime on the Templates page.
-- All of the above persists **only in the browser** (`localStorage`), with the same PoC limits as below (no sync, accounts, or production guarantees).
-
-## PoC scope
-
-- Data is browser-local only (`localStorage`); clearing site data removes it.
-- No user accounts or authentication.
-- No backend or server-side API.
-- No cross-device sync.
-- Not production-hardened (security, backups, and operational guarantees are out of scope for this PoC).
-- The interface is polished for demos and R&D handoff; it does not replace shared sync, auth, or enterprise workflow tooling.
-- Filtering and card order are browser-local and stored in `localStorage` with tasks. Drag-and-drop while filters are active uses **visible** cards only to decide insert position (hidden tasks are not inferred)—intentional for this PoC.
-
-## Recommended next product steps
-
-1. Add approvals, RACI, or formal runbook links per task type.
-2. Add JSON import/export.
-3. Add keyboard-accessible reorder shortcuts beyond the Move menu.
-4. Add multi-select or bulk actions.
-5. Consider a backend only if sync or collaboration becomes a requirement.
-
-## Requirements
-
-- [Node.js](https://nodejs.org/) (includes `npm`)
+- **Task board** — Backlog, In Progress, Blocked, and Done lanes; create, edit, delete, and move tasks.
+- **Drag and drop task ordering** — Reorder within a column and move between columns (`@dnd-kit/core`).
+- **Epics** — Group work, reorder epics, open epic detail, and link tasks from the board.
+- **Reusable task templates** — Manage patterns on `/templates` and quick-create from the board.
+- **Task metadata** — Type, priority, due date, owner, and optional epic link on each task.
+- **Search and filters** — Search title, description, and owner; filter by status, epic, type, and priority with clear filters.
+- **Light and dark theme** — Toggle in the sidebar; choice is persisted in the browser.
+- **Browser-local persistence** — Tasks, epics, templates, theme, and sidebar width in `localStorage`.
+- **Inline validation** — Required task, epic, and template titles surface clear errors instead of failing silently.
 
 ## Setup and run
 
@@ -57,27 +40,65 @@ npm run dev
 
 Open the URL shown in the terminal (usually `http://localhost:5173`).
 
-### Other scripts
+## Build check
 
-| Command        | Description                    |
-| -------------- | ------------------------------ |
-| `npm run dev`  | Start dev server with hot reload |
-| `npm run build` | Production build to `dist/`   |
-| `npm run preview` | Preview the production build locally |
+```bash
+npm run build
+npm run preview
+```
+
+Use `preview` to verify production output and client-side routing (for example `/epics` after refresh).
 
 ## Data storage
 
-All data is saved in **localStorage** on your machine:
+All data is saved in **localStorage** on this machine. Keys are fixed; renaming them would orphan existing data.
 
-| Key              | Contents                          |
-| ---------------- | --------------------------------- |
-| `kanban-tasks`   | Task list (JSON): `order`, `taskType`, `priority`, `dueDate`, `owner`, epic link, timestamps |
-| `kanban-task-templates` | Reusable migration templates (JSON) |
-| `kanban-epics`   | Epics list (JSON)                 |
-| `kanban-theme`   | `light` or `dark`                 |
+| Key | Contents |
+| --- | --- |
+| `kanban-tasks` | Task list (JSON): order, column, task type, priority, due date, owner, epic link, timestamps |
+| `kanban-epics` | Epics list (JSON) |
+| `kanban-task-templates` | Reusable templates (JSON) |
+| `kanban-theme` | `light` or `dark` |
 | `kanban-sidebar-width` | Sidebar width in pixels (desktop) |
 
-Clear site data for this origin in your browser settings to reset the app.
+Clear site data for this origin in the browser to reset the app.
+
+On load, malformed `localStorage` JSON or unexpected shapes do not crash the app: tasks and epics fall back to empty lists; invalid rows are skipped. Templates default to the built-in seed list when the key is missing or empty; corrupt template JSON yields an empty list until you add templates again. Task types **Migration** and **Day 2** map to **Execution** and **Follow-up** respectively. Other unknown task types are normalised when data is loaded or saved.
+
+## PoC scope and limitations
+
+- **Browser-local only** — No server; data stays on the device unless you copy or export it yourself.
+- **No backend** — No API, sync, or collaboration service.
+- **No accounts** — No authentication or per-user storage.
+- **No cross-device sync** — Each browser profile has its own `localStorage`.
+- **No role-based permissions** — Anyone with access to the browser profile can read or change stored data.
+- **localStorage** can be cleared by the browser or the user; there is no built-in recovery or backup.
+- **Not production hardened** — Security, compliance, backups, and operational guarantees are out of scope for this PoC.
+- **Drag/drop and filtering** are intentionally lightweight (for example, active filters affect which cards are visible when choosing drop targets).
+- **No comments, activity history, or sprint model** in this PoC.
+- **No audit trail** or built-in import/export yet.
+
+## Recommended next steps
+
+Short-term product ideas (see **`HANDOFF.md`** for a longer ordered engineering backlog):
+
+1. Approvals or ownership models beyond a single optional owner field.
+2. JSON import/export.
+3. Keyboard-accessible reorder shortcuts beyond the Move menu.
+4. Multi-select or bulk actions.
+5. A backend only if sync or collaboration becomes a requirement.
+
+## Requirements
+
+- [Node.js](https://nodejs.org/) (includes `npm`)
+
+### Other scripts
+
+| Command | Description |
+| --- | --- |
+| `npm run dev` | Dev server with hot reload |
+| `npm run build` | Production build to `dist/` |
+| `npm run preview` | Preview the production build locally |
 
 ## Tech stack
 

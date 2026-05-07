@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { useDraggable, useDroppable } from '@dnd-kit/core'
 import { COLUMNS } from '../data/columns'
+import { normaliseTaskType, DEFAULT_TASK_TYPE } from '../data/taskMetadata'
+import { formatDateLabel } from '../utils/formatDateLabel'
 
 function priorityVariant(priority) {
   switch (priority) {
@@ -15,9 +17,19 @@ function priorityVariant(priority) {
   }
 }
 
-function formatDueHint(isoDate) {
-  if (!isoDate || typeof isoDate !== 'string' || !isoDate.trim()) return null
-  return isoDate
+/** Safe BEM suffix for `card--priority-*` from task.priority */
+function priorityCardClass(priority) {
+  const raw = String(priority ?? 'Medium')
+    .trim()
+    .toLowerCase()
+  const allowed = new Set(['low', 'medium', 'high', 'critical'])
+  const key = allowed.has(raw) ? raw : 'medium'
+  return `card--priority-${key}`
+}
+
+function dueDisplay(isoDate) {
+  const formatted = formatDateLabel(isoDate)
+  return formatted || null
 }
 
 function CardContent({ task, epics = [], onMove, onEdit, onDelete, isOverlay = false }) {
@@ -25,26 +37,27 @@ function CardContent({ task, epics = [], onMove, onEdit, onDelete, isOverlay = f
   const otherColumns = COLUMNS.filter((c) => c.id !== task.columnId)
   const epic = task.epicId ? epics.find((e) => e.id === task.epicId) : null
 
-  const taskTypeLabel = task.taskType || 'Discovery'
+  const taskTypeLabel = normaliseTaskType(
+    task.taskType ?? '',
+    DEFAULT_TASK_TYPE
+  )
   const priorityLabel = task.priority || 'Medium'
-  const dueStr = formatDueHint(task.dueDate)
+  const dueStr = dueDisplay(task.dueDate)
   const ownerStr = typeof task.owner === 'string' && task.owner.trim() ? task.owner.trim() : null
+  const priorityClass = priorityCardClass(task.priority)
 
   return (
     <div
-      className={`card ${isOverlay ? 'card--overlay' : 'card--interactive'}`}
+      className={`card ${priorityClass} ${isOverlay ? 'card--overlay' : 'card--interactive'}`}
     >
-      <div className="card-header">
-        <div className="card-title-block">
-          <div className="card-badges">
-            <span className="task-type-badge">{taskTypeLabel}</span>
-            <span
-              className={`priority-badge priority-badge--${priorityVariant(priorityLabel)}`}
-            >
-              {priorityLabel}
-            </span>
-          </div>
-          <h3 className="card-title">{task.title}</h3>
+      <div className="card-toolbar">
+        <div className="card-badges">
+          <span className="task-type-badge">{taskTypeLabel}</span>
+          <span
+            className={`priority-badge priority-badge--${priorityVariant(priorityLabel)}`}
+          >
+            {priorityLabel}
+          </span>
           {epic ? (
             <span className="epic-badge">{epic.name}</span>
           ) : task.epicId ? (
@@ -67,30 +80,30 @@ function CardContent({ task, epics = [], onMove, onEdit, onDelete, isOverlay = f
                 >
                   Move
                 </button>
-            {showMoveMenu && (
-              <>
-                <div
-                  className="card-move-backdrop"
-                  onClick={() => setShowMoveMenu(false)}
-                  aria-hidden
-                />
-                <div className="card-move-menu">
-                  {otherColumns.map((col) => (
-                    <button
-                      key={col.id}
-                      type="button"
-                      className="card-move-item"
-                      onClick={() => {
-                        onMove(task.id, col.id)
-                        setShowMoveMenu(false)
-                      }}
-                    >
-                      → {col.title}
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
+                {showMoveMenu && (
+                  <>
+                    <div
+                      className="card-move-backdrop"
+                      onClick={() => setShowMoveMenu(false)}
+                      aria-hidden
+                    />
+                    <div className="card-move-menu">
+                      {otherColumns.map((col) => (
+                        <button
+                          key={col.id}
+                          type="button"
+                          className="card-move-item"
+                          onClick={() => {
+                            onMove(task.id, col.id)
+                            setShowMoveMenu(false)
+                          }}
+                        >
+                          → {col.title}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
               </div>
             )}
             <button
@@ -120,22 +133,28 @@ function CardContent({ task, epics = [], onMove, onEdit, onDelete, isOverlay = f
           </div>
         )}
       </div>
-      {task.description && (
+
+      <h3 className="card-title">{task.title}</h3>
+
+      {task.description ? (
         <p className="card-description">{task.description}</p>
-      )}
+      ) : null}
+
       {dueStr || ownerStr ? (
-        <div className="card-meta">
-          {dueStr ? (
-            <span className="card-meta-item card-meta-item--due">
-              <span className="card-meta-label">Due</span> {dueStr}
-            </span>
-          ) : null}
+        <footer className="card-footer">
           {ownerStr ? (
-            <span className="card-meta-item card-meta-item--owner">
-              <span className="card-meta-label">Owner</span> {ownerStr}
+            <span className="card-footer-item" title={ownerStr}>
+              <span className="card-footer-label">Owner</span>
+              <span className="card-footer-value">{ownerStr}</span>
             </span>
           ) : null}
-        </div>
+          {dueStr ? (
+            <span className="card-footer-item card-footer-item--due">
+              <span className="card-footer-label">Due</span>
+              <span className="card-footer-value">{dueStr}</span>
+            </span>
+          ) : null}
+        </footer>
       ) : null}
     </div>
   )

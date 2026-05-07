@@ -10,6 +10,7 @@ export default function EpicsPage({
 }) {
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
+  const [nameError, setNameError] = useState(false)
   const [draggingEpicId, setDraggingEpicId] = useState(null)
   const [dragOverEpicId, setDragOverEpicId] = useState(null)
 
@@ -24,7 +25,11 @@ export default function EpicsPage({
   function handleSubmit(e) {
     e.preventDefault()
     const n = name.trim()
-    if (!n) return
+    if (!n) {
+      setNameError(true)
+      return
+    }
+    setNameError(false)
     onCreateEpic({ name: n, description: description.trim() })
     setName('')
     setDescription('')
@@ -47,41 +52,74 @@ export default function EpicsPage({
 
   return (
     <div className="epics-page">
-      <div className="epics-page-intro">
-        <h2 className="epics-page-title">Epics</h2>
-        <p className="epics-page-desc">
-          Group work into epics, then link tasks on the board to an epic when you create or edit them.
-        </p>
-      </div>
-      <form className="epic-form" onSubmit={handleSubmit}>
-        <h3 className="epic-form-heading">New epic</h3>
-        <input
-          type="text"
-          className="task-form-input"
-          placeholder="Epic name"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-        />
-        <textarea
-          className="task-form-textarea"
-          placeholder="Description (optional)"
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          rows={2}
-        />
-        <button type="submit" className="btn btn-primary">
-          Create epic
-        </button>
+      <form className="epic-form" onSubmit={handleSubmit} noValidate>
+        <h3 className="surface-form-heading">New epic</h3>
+        <div className="template-form-field">
+          <label
+            className="task-form-label task-form-label--block"
+            htmlFor="epic-create-name"
+          >
+            Epic name
+          </label>
+          <input
+            id="epic-create-name"
+            type="text"
+            className="task-form-input"
+            placeholder="Epic name"
+            value={name}
+            onChange={(e) => {
+              setName(e.target.value)
+              if (nameError) setNameError(false)
+            }}
+            aria-invalid={nameError}
+            aria-describedby={nameError ? 'epic-create-name-err' : undefined}
+            autoComplete="off"
+          />
+          {nameError ? (
+            <p id="epic-create-name-err" className="form-error" role="alert">
+              Epic name is required.
+            </p>
+          ) : null}
+        </div>
+        <div className="template-form-field">
+          <label
+            className="task-form-label task-form-label--block"
+            htmlFor="epic-create-desc"
+          >
+            Description (optional)
+          </label>
+          <textarea
+            id="epic-create-desc"
+            className="task-form-textarea"
+            placeholder="Description (optional)"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            rows={2}
+          />
+        </div>
+        <div className="task-form-actions">
+          <button type="submit" className="btn btn-primary">
+            Create epic
+          </button>
+        </div>
       </form>
       <section className="epics-list-section" aria-labelledby="epics-list-heading">
-        <h3 id="epics-list-heading" className="epics-list-heading">
+        <h3 id="epics-list-heading" className="page-section-heading">
           All epics ({epics.length})
         </h3>
         {epics.length > 1 ? (
           <p className="epics-hint">Drag epics to reorder them.</p>
         ) : null}
         {epics.length === 0 ? (
-          <p className="epics-empty">No epics yet. Create one above.</p>
+          <div className="empty-state" role="status">
+            <div className="empty-state-inner">
+              <div className="empty-state-panel">
+                <p className="empty-state-message">
+                  No epics yet. Create one to group related work.
+                </p>
+              </div>
+            </div>
+          </div>
         ) : (
           <ul className="epics-list">
             {epics.map((epic) => (
@@ -107,9 +145,11 @@ export default function EpicsPage({
               >
                 <div className="epics-list-body">
                   <div className="epics-list-name-row">
-                    <span className="epics-drag-handle" aria-hidden>
-                      ::
-                    </span>
+                    <span
+                      className="epics-drag-handle"
+                      aria-hidden
+                      title="Drag to reorder"
+                    />
                     <Link to={`/epics/${epic.id}`} className="epics-list-name-link">
                       <span className="epics-list-name">{epic.name}</span>
                     </Link>
@@ -128,11 +168,11 @@ export default function EpicsPage({
                   </Link>
                   <button
                     type="button"
-                    className="btn btn-ghost epics-list-delete"
+                    className="btn btn-ghost btn--danger-quiet epics-list-delete"
                     onClick={() => {
                       if (
                         window.confirm(
-                          `Delete epic “${epic.name}”? Tasks linked to it will no longer be assigned to this epic.`
+                          `Delete epic “${epic.name}”? Linked tasks will remain, but they will no longer be assigned to this epic.`
                         )
                       ) {
                         onDeleteEpic(epic.id)

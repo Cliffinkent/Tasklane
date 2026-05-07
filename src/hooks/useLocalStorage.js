@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react'
 import { COLUMN_IDS } from '../data/columns'
 import {
-  TASK_TYPE_SET,
+  normaliseTaskType,
   PRIORITY_SET,
-  DEFAULT_TASK_TYPE,
   DEFAULT_PRIORITY,
 } from '../data/taskMetadata'
 
@@ -41,16 +40,15 @@ function normalizeStoredTask(t) {
       : createdAt
   if (!Number.isFinite(Date.parse(updatedAt))) updatedAt = createdAt
 
-  let taskType =
-    typeof t.taskType === 'string' && TASK_TYPE_SET.has(t.taskType)
-      ? t.taskType
-      : DEFAULT_TASK_TYPE
+  const taskType = normaliseTaskType(
+    typeof t.taskType === 'string' ? t.taskType : ''
+  )
   let priority =
     typeof t.priority === 'string' && PRIORITY_SET.has(t.priority)
       ? t.priority
       : DEFAULT_PRIORITY
   const dueDate =
-    typeof t.dueDate === 'string' ? t.dueDate : ''
+    typeof t.dueDate === 'string' ? t.dueDate.trim() : ''
   const owner = String(t.owner ?? '').trim()
 
   const rawOrder = Number(t.order)
@@ -105,7 +103,10 @@ function getStored() {
     if (!raw) return []
     const parsed = JSON.parse(raw)
     if (!Array.isArray(parsed)) return []
-    const rows = parsed.map(normalizeStoredTask).filter(Boolean)
+    const rows = parsed
+      .filter((item) => item && typeof item === 'object')
+      .map(normalizeStoredTask)
+      .filter(Boolean)
     return normalizeOrdersInPayload(rows)
   } catch (_) {
     return []

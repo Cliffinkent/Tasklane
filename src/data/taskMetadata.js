@@ -2,9 +2,9 @@ export const TASK_TYPES = [
   'Discovery',
   'Assessment',
   'Planning',
-  'Migration',
+  'Execution',
   'Validation',
-  'Day 2',
+  'Follow-up',
 ]
 
 export const PRIORITIES = ['Low', 'Medium', 'High', 'Critical']
@@ -15,69 +15,75 @@ export const DEFAULT_PRIORITY = 'Medium'
 export const TASK_TYPE_SET = new Set(TASK_TYPES)
 export const PRIORITY_SET = new Set(PRIORITIES)
 
-export const MIGRATION_TASK_TEMPLATES = [
+export function normaliseTaskType(value, fallback = 'Discovery') {
+  if (value === 'Migration') return 'Execution'
+  if (value === 'Day 2') return 'Follow-up'
+  return TASK_TYPES.includes(value) ? value : fallback
+}
+
+export const TASK_TEMPLATES = [
   {
-    id: 'discovery-workshop',
-    label: 'Discovery workshop',
-    title: 'Run discovery workshop',
+    id: 'backlog-refinement',
+    label: 'Backlog refinement',
+    title: 'Refine backlog item',
     description:
-      'Capture application, infrastructure, dependency, and stakeholder context.',
-    taskType: 'Discovery',
-    priority: 'High',
+      'Clarify scope, acceptance criteria, dependencies, and next steps.',
+    taskType: 'Planning',
+    priority: 'Medium',
     dueDate: '',
     owner: '',
   },
   {
-    id: 'application-assessment',
-    label: 'Application assessment',
-    title: 'Assess application migration readiness',
+    id: 'feature-planning',
+    label: 'Feature planning',
+    title: 'Plan feature delivery',
     description:
-      'Review hosting model, dependencies, data flows, risk, complexity, and target landing zone fit.',
-    taskType: 'Assessment',
-    priority: 'High',
-    dueDate: '',
-    owner: '',
-  },
-  {
-    id: 'migration-plan',
-    label: 'Migration plan',
-    title: 'Create migration execution plan',
-    description:
-      'Define migration waves, cutover approach, rollback plan, owners, and acceptance criteria.',
+      'Define the feature outcome, delivery approach, owners, dependencies, and success criteria.',
     taskType: 'Planning',
     priority: 'High',
     dueDate: '',
     owner: '',
   },
   {
-    id: 'execute-migration',
-    label: 'Execute migration',
-    title: 'Execute migration runbook',
+    id: 'implementation-task',
+    label: 'Implementation task',
+    title: 'Implement task',
     description:
-      'Run the approved migration steps, capture issues, and update migration status.',
-    taskType: 'Migration',
-    priority: 'Critical',
+      'Build the agreed change, update relevant documentation, and prepare for review.',
+    taskType: 'Execution',
+    priority: 'Medium',
     dueDate: '',
     owner: '',
   },
   {
-    id: 'validate-workload',
-    label: 'Validate workload',
-    title: 'Validate migrated workload',
+    id: 'review-validation',
+    label: 'Review and validation',
+    title: 'Review and validate work',
     description:
-      'Confirm application health, connectivity, performance, security controls, and business acceptance.',
+      'Check the change against acceptance criteria, capture issues, and confirm readiness.',
     taskType: 'Validation',
     priority: 'High',
     dueDate: '',
     owner: '',
   },
   {
-    id: 'day-2-handover',
-    label: 'Day 2 handover',
-    title: 'Complete Day 2 operations handover',
+    id: 'blocker-investigation',
+    label: 'Blocker investigation',
+    title: 'Investigate blocker',
     description:
-      'Document monitoring, backup, support model, ownership, and operational readiness.',
-    taskType: 'Day 2',
+      'Identify the cause of the blocker, document options, and agree the next action.',
+    taskType: 'Assessment',
+    priority: 'High',
+    dueDate: '',
+    owner: '',
+  },
+  {
+    id: 'handover-task',
+    label: 'Handover task',
+    title: 'Prepare handover',
+    description:
+      'Document ownership, support notes, operational considerations, and follow-up actions.',
+    taskType: 'Follow-up',
     priority: 'Medium',
     dueDate: '',
     owner: '',

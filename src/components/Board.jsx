@@ -10,7 +10,12 @@ import {
   defaultDropAnimationSideEffects,
 } from '@dnd-kit/core'
 import { COLUMNS } from '../data/columns'
-import { TASK_TYPES, PRIORITIES } from '../data/taskMetadata'
+import {
+  TASK_TYPES,
+  PRIORITIES,
+  normaliseTaskType,
+  DEFAULT_TASK_TYPE,
+} from '../data/taskMetadata'
 import Column from './Column'
 import TaskForm from './TaskForm'
 import Card, { CardContent } from './Card'
@@ -36,7 +41,10 @@ function filterBoardTasks(tasks, filters) {
     if (status !== 'all' && t.columnId !== status) return false
     if (epic === 'none' && t.epicId) return false
     if (epic !== 'all' && epic !== 'none' && t.epicId !== epic) return false
-    if (taskType !== 'all' && (t.taskType ?? 'Discovery') !== taskType) {
+    if (
+      taskType !== 'all' &&
+      normaliseTaskType(t.taskType ?? '', DEFAULT_TASK_TYPE) !== taskType
+    ) {
       return false
     }
     if (priority !== 'all' && (t.priority ?? 'Medium') !== priority) {
@@ -217,21 +225,21 @@ export default function Board({
           <div className="board-primary-actions">
             <button
               type="button"
-              className="btn btn-primary"
+              className="btn btn-primary board-add-task"
               onClick={openBlankCreate}
             >
               Add task
             </button>
-            <label className="template-picker" htmlFor="migration-template-select">
+            <label className="template-picker" htmlFor="task-template-select">
               <span className="sr-only">Use template</span>
               <select
                 key={templateSelectKey}
-                id="migration-template-select"
+                id="task-template-select"
                 className="template-picker-select"
                 defaultValue=""
                 disabled={templates.length === 0}
                 onChange={handleTemplateSelect}
-                aria-label="Use migration task template"
+                aria-label="Use task template"
               >
                 <option value="">
                   {templates.length === 0 ? 'No templates' : 'Use template...'}
@@ -328,7 +336,7 @@ export default function Board({
           onClick={closeTaskModal}
         >
           <div
-            className="board-form-panel board-form-panel--migration"
+            className="board-form-panel board-form-panel--modal"
             role="dialog"
             aria-modal="true"
             aria-labelledby="board-task-dialog-title"
@@ -376,7 +384,7 @@ export default function Board({
                 title={column.title}
                 tasks={visibleByColumn[column.id] || []}
                 totalInColumn={totalInColumn}
-                filterActive={hasActiveFilters}
+                filtersActive={hasActiveFilters}
                 epics={epics}
                 onRepositionTask={onRepositionTask}
                 onEditTask={(id) => {

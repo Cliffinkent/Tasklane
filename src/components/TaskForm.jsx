@@ -1,5 +1,10 @@
 import { useState, useEffect } from 'react'
-import { TASK_TYPES, PRIORITIES } from '../data/taskMetadata'
+import {
+  TASK_TYPES,
+  PRIORITIES,
+  normaliseTaskType,
+  DEFAULT_TASK_TYPE,
+} from '../data/taskMetadata'
 
 export default function TaskForm({
   onSubmit,
@@ -24,7 +29,9 @@ export default function TaskForm({
       setTitle(initialTask.title ?? '')
       setDescription(initialTask.description ?? '')
       setEpicId(initialTask.epicId ?? '')
-      setTaskType(initialTask.taskType ?? 'Discovery')
+      setTaskType(
+        normaliseTaskType(initialTask.taskType ?? '', DEFAULT_TASK_TYPE)
+      )
       setPriority(initialTask.priority ?? 'Medium')
       setDueDate(typeof initialTask.dueDate === 'string' ? initialTask.dueDate : '')
       setOwner(initialTask.owner ?? '')
@@ -32,7 +39,12 @@ export default function TaskForm({
       setTitle(draftDefaults?.title ?? '')
       setDescription(draftDefaults?.description ?? '')
       setEpicId(draftDefaults?.epicId ?? '')
-      setTaskType(draftDefaults?.taskType ?? 'Discovery')
+      setTaskType(
+        normaliseTaskType(
+          draftDefaults?.taskType ?? '',
+          DEFAULT_TASK_TYPE
+        )
+      )
       setPriority(draftDefaults?.priority ?? 'Medium')
       setDueDate(draftDefaults?.dueDate ?? '')
       setOwner(draftDefaults?.owner ?? '')
@@ -97,7 +109,7 @@ export default function TaskForm({
             aria-describedby={showTitleError ? 'task-title-error' : undefined}
           />
           {showTitleError ? (
-            <p id="task-title-error" className="task-form-inline-error" role="alert">
+            <p id="task-title-error" className="form-error" role="alert">
               Task title is required.
             </p>
           ) : null}
