@@ -26,7 +26,13 @@ export default function Column({
   onEditTask,
   onDeleteTask,
 }) {
-  const { setNodeRef, isOver } = useDroppable({ id: columnId })
+  const { setNodeRef, isOver } = useDroppable({
+    id: columnId,
+    data: {
+      type: 'column',
+      columnId,
+    },
+  })
 
   const isEmpty = tasks.length === 0
   const variantClass = COLUMN_CLASS[columnId] || ''
@@ -41,6 +47,7 @@ export default function Column({
 
   return (
     <div
+      ref={setNodeRef}
       className={`column ${variantClass} ${isOver ? 'column--over' : ''}`.trim()}
     >
       <header className="column-header">
@@ -59,10 +66,7 @@ export default function Column({
           {tasks.length}
         </span>
       </header>
-      <div
-        ref={setNodeRef}
-        className={`column-cards ${showEmptyState ? 'column-cards--empty' : ''}`}
-      >
+      <div className={`column-cards ${showEmptyState ? 'column-cards--empty' : ''}`}>
         {showEmptyState ? (
           <div className="column-empty" role="status">
             <div className="column-empty-panel">

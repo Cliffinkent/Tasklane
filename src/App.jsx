@@ -41,6 +41,33 @@ function resolveEpicId(epicId, epics) {
   return epics.some((e) => e.id === epicId) ? epicId : null
 }
 
+function parseCommentTimestamp(value, fallback) {
+  if (typeof value === 'string' && value.trim() && Number.isFinite(Date.parse(value))) {
+    return value
+  }
+  return fallback
+}
+
+function normaliseCommentInput(comment, index, taskId, fallbackNow) {
+  if (!comment || typeof comment !== 'object') return null
+  const body = String(comment.body ?? '').trim()
+  if (!body) return null
+  const rawId = String(comment.id ?? '').trim()
+  const id = rawId || `${taskId}-comment-${index}`
+  const createdAt = parseCommentTimestamp(comment.createdAt, fallbackNow)
+  const updatedAt = parseCommentTimestamp(comment.updatedAt, createdAt)
+  return { id, body, createdAt, updatedAt }
+}
+
+function normaliseCommentsInput(comments, taskId, fallbackNow) {
+  if (!Array.isArray(comments)) return []
+  return comments
+    .map((comment, index) =>
+      normaliseCommentInput(comment, index, taskId, fallbackNow)
+    )
+    .filter(Boolean)
+}
+
 function reorderById(items, fromId, toId) {
   if (!fromId || !toId || fromId === toId) return items
   const fromIndex = items.findIndex((x) => x.id === fromId)
@@ -50,6 +77,36 @@ function reorderById(items, fromId, toId) {
   const [moved] = next.splice(fromIndex, 1)
   next.splice(toIndex, 0, moved)
   return next
+}
+
+/** Build one backlog task from import payload (preview row without source). epicId always null as per import spec. */
+function createTaskFromImportInput(input, order, now) {
+  const trimmedTitle = String(input.title ?? '').trim()
+  if (!trimmedTitle) return null
+  const taskType = normaliseTaskType(
+    typeof input.taskType === 'string' ? input.taskType : ''
+  )
+  const priority = PRIORITY_SET.has(input.priority)
+    ? input.priority
+    : DEFAULT_PRIORITY
+  const dueDate =
+    typeof input.dueDate === 'string' ? input.dueDate.trim() : ''
+  const owner = String(input.owner ?? '').trim()
+  return {
+    id: crypto.randomUUID(),
+    title: trimmedTitle,
+    description: String(input.description ?? '').trim(),
+    columnId: 'backlog',
+    epicId: null,
+    createdAt: now,
+    updatedAt: now,
+    order,
+    taskType,
+    priority,
+    dueDate,
+    owner,
+    comments: [],
+  }
 }
 
 /** Next append order for a column (max + 1). */
@@ -180,10 +237,32 @@ function App() {
         priority,
         dueDate,
         owner,
+        comments: [],
       }
       return [...prev, task]
     })
     return true
+  }
+
+  /** Create multiple tasks in backlog in one atomic update; order appended after existing backlog. Returns count created. */
+  function handleCreateTasks(items) {
+    const list = Array.isArray(items) ? items : []
+    const now = new Date().toISOString()
+    const createdCount = list.filter((item) =>
+      String(item.title ?? '').trim()
+    ).length
+    setTasks((prev) => {
+      let order = getNextOrderForColumn(prev, 'backlog')
+      const newTasks = []
+      for (const item of list) {
+        const row = createTaskFromImportInput(item, order, now)
+        if (!row) continue
+        newTasks.push(row)
+        order += 1
+      }
+      return newTasks.length ? [...prev, ...newTasks] : prev
+    })
+    return createdCount
   }
 
   function handleRepositionTask(activeTaskId, overId) {
@@ -195,7 +274,7 @@ function App() {
 
   function handleUpdate(
     taskId,
-    { title, description, epicId, taskType, priority, dueDate, owner }
+    { title, description, epicId, taskType, priority, dueDate, owner, comments }
   ) {
     const nextEpicId = resolveEpicId(epicId, epics)
     const now = new Date().toISOString()
@@ -207,6 +286,11 @@ function App() {
         if (!trimmedTitle) return t
         didUpdate = true
         const currentPriority = t.priority ?? DEFAULT_PRIORITY
+        const currentComments = Array.isArray(t.comments) ? t.comments : []
+        const nextComments =
+          comments === undefined
+            ? currentComments
+            : normaliseCommentsInput(comments, t.id, now)
         return {
           ...t,
           title: trimmedTitle,
@@ -223,6 +307,7 @@ function App() {
               : String(dueDate ?? ''),
           owner:
             owner === undefined ? (t.owner ?? '') : String(owner ?? '').trim(),
+          comments: nextComments,
           updatedAt: now,
         }
       })
@@ -407,6 +492,7 @@ function App() {
                 epics={epics}
                 templates={templates}
                 onCreateTask={handleCreate}
+                onCreateTasks={handleCreateTasks}
                 onRepositionTask={handleRepositionTask}
                 onUpdateTask={handleUpdate}
                 onDeleteTask={handleDeleteTask}

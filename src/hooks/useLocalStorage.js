@@ -18,6 +18,35 @@ function parseIsoOrNow(v) {
   return Number.isFinite(t) ? v : nowIso()
 }
 
+function normalizeStoredComments(taskId, rawComments, fallbackCreatedAt) {
+  if (!Array.isArray(rawComments)) return []
+  const fallbackTime = fallbackCreatedAt || nowIso()
+
+  return rawComments
+    .map((comment, index) => {
+      if (!comment || typeof comment !== 'object') return null
+      const body = String(comment.body ?? '').trim()
+      if (!body) return null
+
+      const rawId = String(comment.id ?? '').trim()
+      const id = rawId || `${taskId}-comment-${index}`
+      const createdAt = parseIsoOrNow(comment.createdAt || fallbackTime)
+      let updatedAt =
+        typeof comment.updatedAt === 'string' && comment.updatedAt.trim()
+          ? comment.updatedAt
+          : createdAt
+      if (!Number.isFinite(Date.parse(updatedAt))) updatedAt = createdAt
+
+      return {
+        id,
+        body,
+        createdAt,
+        updatedAt,
+      }
+    })
+    .filter(Boolean)
+}
+
 function normalizeStoredTask(t) {
   if (!t || typeof t !== 'object') return null
   const id = String(t.id ?? '').trim()
@@ -50,6 +79,7 @@ function normalizeStoredTask(t) {
   const dueDate =
     typeof t.dueDate === 'string' ? t.dueDate.trim() : ''
   const owner = String(t.owner ?? '').trim()
+  const comments = normalizeStoredComments(id, t.comments, createdAt)
 
   const rawOrder = Number(t.order)
   const row = {
@@ -64,6 +94,7 @@ function normalizeStoredTask(t) {
     priority,
     dueDate,
     owner,
+    comments,
   }
   if (Number.isFinite(rawOrder) && rawOrder >= 0) row.order = rawOrder
   return row

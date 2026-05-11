@@ -23,6 +23,38 @@ export default function TaskForm({
   const [dueDate, setDueDate] = useState('')
   const [owner, setOwner] = useState('')
   const [titleError, setTitleError] = useState(false)
+  const [comments, setComments] = useState([])
+  const [commentDraft, setCommentDraft] = useState('')
+  const [commentError, setCommentError] = useState(false)
+
+  function normaliseLocalComments(raw) {
+    if (!Array.isArray(raw)) return []
+    return raw
+      .map((comment, index) => {
+        if (!comment || typeof comment !== 'object') return null
+        const body = String(comment.body ?? '').trim()
+        if (!body) return null
+        const now = new Date().toISOString()
+        const id = String(comment.id ?? '').trim() || `comment-${index}-${now}`
+        const createdAt =
+          typeof comment.createdAt === 'string' && comment.createdAt.trim()
+            ? comment.createdAt
+            : now
+        const updatedAt =
+          typeof comment.updatedAt === 'string' && comment.updatedAt.trim()
+            ? comment.updatedAt
+            : createdAt
+        return { id, body, createdAt, updatedAt }
+      })
+      .filter(Boolean)
+  }
+
+  function formatCommentTimestamp(value) {
+    if (!value || typeof value !== 'string') return ''
+    const d = new Date(value)
+    if (Number.isNaN(d.getTime())) return value
+    return d.toLocaleString()
+  }
 
   useEffect(() => {
     if (isEdit) {
@@ -35,6 +67,7 @@ export default function TaskForm({
       setPriority(initialTask.priority ?? 'Medium')
       setDueDate(typeof initialTask.dueDate === 'string' ? initialTask.dueDate : '')
       setOwner(initialTask.owner ?? '')
+      setComments(normaliseLocalComments(initialTask.comments))
     } else {
       setTitle(draftDefaults?.title ?? '')
       setDescription(draftDefaults?.description ?? '')
@@ -48,8 +81,11 @@ export default function TaskForm({
       setPriority(draftDefaults?.priority ?? 'Medium')
       setDueDate(draftDefaults?.dueDate ?? '')
       setOwner(draftDefaults?.owner ?? '')
+      setComments([])
     }
     setTitleError(false)
+    setCommentDraft('')
+    setCommentError(false)
   }, [initialTask, draftDefaults, isEdit])
 
   function resetCreateFields() {
@@ -60,6 +96,33 @@ export default function TaskForm({
     setPriority('Medium')
     setDueDate('')
     setOwner('')
+    setComments([])
+    setCommentDraft('')
+    setCommentError(false)
+  }
+
+  function handleAddComment() {
+    const body = commentDraft.trim()
+    if (!body) {
+      setCommentError(true)
+      return
+    }
+    const now = new Date().toISOString()
+    setComments((prev) => [
+      ...prev,
+      {
+        id: crypto.randomUUID(),
+        body,
+        createdAt: now,
+        updatedAt: now,
+      },
+    ])
+    setCommentDraft('')
+    setCommentError(false)
+  }
+
+  function handleDeleteComment(commentId) {
+    setComments((prev) => prev.filter((comment) => comment.id !== commentId))
   }
 
   function handleSubmit(e) {
@@ -70,7 +133,7 @@ export default function TaskForm({
       return
     }
     setTitleError(false)
-    onSubmit({
+    const payload = {
       title,
       description,
       epicId: epicId || '',
@@ -78,7 +141,11 @@ export default function TaskForm({
       priority,
       dueDate,
       owner,
-    })
+    }
+    if (isEdit) {
+      payload.comments = comments
+    }
+    onSubmit(payload)
     if (!isEdit) {
       resetCreateFields()
     }
@@ -211,6 +278,59 @@ export default function TaskForm({
           </select>
         </div>
       </div>
+
+      {isEdit ? (
+        <section className="task-comments" aria-label="Comments">
+          <h3 className="task-comments-heading">Comments</h3>
+          {comments.length > 0 ? (
+            <ul className="task-comments-list">
+              {comments.map((comment) => (
+                <li key={comment.id} className="task-comment-item">
+                  <p className="task-comment-body">{comment.body}</p>
+                  <div className="task-comment-meta">
+                    <span>{formatCommentTimestamp(comment.createdAt)}</span>
+                    <button
+                      type="button"
+                      className="task-comment-delete"
+                      onClick={() => handleDeleteComment(comment.id)}
+                    >
+                      Delete comment
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="task-comment-meta">No comments yet.</p>
+          )}
+          <div className="task-comment-add">
+            <label className="task-form-label task-form-label--block" htmlFor="task-comment-input">
+              Add comment
+            </label>
+            <textarea
+              id="task-comment-input"
+              className="task-form-textarea task-comment-textarea"
+              placeholder="Add a comment or note"
+              value={commentDraft}
+              onChange={(e) => {
+                setCommentDraft(e.target.value)
+                if (commentError) setCommentError(false)
+              }}
+              rows={3}
+            />
+            {commentError ? (
+              <p className="task-comment-error" role="alert">
+                Comment cannot be empty.
+              </p>
+            ) : null}
+            <div className="task-comment-actions">
+              <button type="button" className="btn btn-secondary" onClick={handleAddComment}>
+                Add comment
+              </button>
+            </div>
+          </div>
+        </section>
+      ) : null}
 
       <div className="task-form-actions">
         <button type="submit" className="btn btn-primary">

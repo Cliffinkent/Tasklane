@@ -7,6 +7,8 @@ import {
   useSensor,
   useSensors,
   closestCenter,
+  pointerWithin,
+  rectIntersection,
   defaultDropAnimationSideEffects,
 } from '@dnd-kit/core'
 import { COLUMNS } from '../data/columns'
@@ -19,6 +21,65 @@ import {
 import Column from './Column'
 import TaskForm from './TaskForm'
 import Card, { CardContent } from './Card'
+import { parseTaskImport } from '../utils/parseTaskImport'
+import { formatDateLabel } from '../utils/formatDateLabel'
+
+const TASKLANE_COPILOT_IMPORT_PROMPT = `You are helping me maintain my Tasklane agile task board.
+
+Review my recent emails and Teams messages and identify concrete actions I need to track.
+
+Return JSON only. Do not include markdown, commentary, headings, or explanations.
+
+Use this exact schema:
+
+{
+  "tasks": [
+    {
+      "title": "Short action title",
+      "description": "Useful context from the email or Teams message",
+      "priority": "Low | Medium | High | Critical",
+      "taskType": "Discovery | Assessment | Planning | Execution | Validation | Follow-up",
+      "owner": "Person or team if explicitly known, otherwise empty string",
+      "dueDate": "YYYY-MM-DD if explicitly stated, otherwise empty string",
+      "source": "Email | Teams | Meeting | Other"
+    }
+  ]
+}
+
+Rules:
+- Only include concrete actions, commitments, follow-ups, blockers, or decisions that need tracking.
+- Do not include general updates unless they require action.
+- Do not invent due dates.
+- Do not invent owners.
+- Keep titles concise and action-oriented.
+- Put useful context in the description.
+- Use priority Medium unless the message clearly indicates urgency or impact.
+- Use source Email for email-derived actions.
+- Use source Teams for Teams-derived actions.
+- Use source Meeting for meeting-derived actions.
+- Return valid JSON only.`
+
+function previewPriorityVariant(p) {
+  switch (p) {
+    case 'Low':
+      return 'low'
+    case 'High':
+      return 'high'
+    case 'Critical':
+      return 'critical'
+    default:
+      return 'medium'
+  }
+}
+
+function normaliseImportTitle(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[-_]/g, ' ')
+    .replace(/[.,:;!?"'()[\]{}]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
 
 function sortTasksByOrder(tasks) {
   return [...tasks].sort(
@@ -66,11 +127,51 @@ function filterBoardTasks(tasks, filters) {
   })
 }
 
+function collisionType(collision) {
+  return collision?.data?.droppableContainer?.data?.current?.type
+}
+
+function columnAwareCollisionDetection(args) {
+  const pointerCollisions = pointerWithin(args)
+
+  if (pointerCollisions.length > 0) {
+    const taskCollision = pointerCollisions.find(
+      (collision) => collisionType(collision) === 'task'
+    )
+    const columnCollision = pointerCollisions.find(
+      (collision) => collisionType(collision) === 'column'
+    )
+
+    if (taskCollision && columnCollision) return [taskCollision, columnCollision]
+    if (taskCollision) return [taskCollision]
+    if (columnCollision) return [columnCollision]
+    return pointerCollisions
+  }
+
+  const rectCollisions = rectIntersection(args)
+  if (rectCollisions.length > 0) {
+    const taskCollision = rectCollisions.find(
+      (collision) => collisionType(collision) === 'task'
+    )
+    const columnCollision = rectCollisions.find(
+      (collision) => collisionType(collision) === 'column'
+    )
+
+    if (taskCollision && columnCollision) return [taskCollision, columnCollision]
+    if (taskCollision) return [taskCollision]
+    if (columnCollision) return [columnCollision]
+    return rectCollisions
+  }
+
+  return closestCenter(args)
+}
+
 export default function Board({
   tasks,
   epics,
   templates = [],
   onCreateTask,
+  onCreateTasks = () => 0,
   onRepositionTask,
   onUpdateTask,
   onDeleteTask,
@@ -87,7 +188,126 @@ export default function Board({
   const [taskTypeFilter, setTaskTypeFilter] = useState('all')
   const [priorityFilter, setPriorityFilter] = useState('all')
 
+  const [showImportModal, setShowImportModal] = useState(false)
+  const [importStep, setImportStep] = useState('paste')
+  const [importRaw, setImportRaw] = useState('')
+  const [importParsedTasks, setImportParsedTasks] = useState([])
+  const [importWarnings, setImportWarnings] = useState([])
+  const [importSelectedIndices, setImportSelectedIndices] = useState(
+    () => new Set()
+  )
+  const [showCopilotPrompt, setShowCopilotPrompt] = useState(false)
+  const [copyPromptStatus, setCopyPromptStatus] = useState('')
+
   const modalOpen = showForm || Boolean(editingTaskId)
+
+  function resetImportModal() {
+    setImportStep('paste')
+    setImportRaw('')
+    setImportParsedTasks([])
+    setImportWarnings([])
+    setImportSelectedIndices(new Set())
+  }
+
+  function closeImportModal() {
+    setShowImportModal(false)
+    setShowCopilotPrompt(false)
+    setCopyPromptStatus('')
+    resetImportModal()
+  }
+
+  function handleCopyCopilotPrompt() {
+    if (!navigator.clipboard?.writeText) {
+      setCopyPromptStatus(
+        'Copy failed. Select the prompt text manually.'
+      )
+      return
+    }
+    navigator.clipboard
+      .writeText(TASKLANE_COPILOT_IMPORT_PROMPT)
+      .then(() => {
+        setCopyPromptStatus('Copied')
+      })
+      .catch(() => {
+        setCopyPromptStatus(
+          'Copy failed. Select the prompt text manually.'
+        )
+      })
+  }
+
+  function openImportModal() {
+    resetImportModal()
+    setShowImportModal(true)
+    setImportStep('paste')
+  }
+
+  function handleImportPreviewClick() {
+    const { tasks: parsedTasks, warnings } = parseTaskImport(importRaw)
+    const existingNormalisedTitles = new Set(
+      tasks
+        .map((t) => normaliseImportTitle(t.title))
+        .filter(Boolean)
+    )
+
+    const previewTasks = parsedTasks.map((task, index) => {
+      const normalisedTitle = normaliseImportTitle(task.title)
+      const isDuplicate = Boolean(normalisedTitle) &&
+        existingNormalisedTitles.has(normalisedTitle)
+      return {
+        ...task,
+        previewId: `import-${index}-${normalisedTitle || 'task'}`,
+        isDuplicate,
+        duplicateReason: isDuplicate
+          ? 'Likely duplicate: title already exists'
+          : '',
+      }
+    })
+
+    setImportParsedTasks(previewTasks)
+    setImportWarnings(warnings)
+    setImportSelectedIndices(
+      new Set(
+        previewTasks
+          .map((task, idx) => (task.isDuplicate ? null : idx))
+          .filter((value) => value !== null)
+      )
+    )
+    setImportStep('preview')
+  }
+
+  function toggleImportSelected(index) {
+    setImportSelectedIndices((prev) => {
+      const next = new Set(prev)
+      if (next.has(index)) next.delete(index)
+      else next.add(index)
+      return next
+    })
+  }
+
+  function handleImportBack() {
+    setImportStep('paste')
+    setImportParsedTasks([])
+    setImportWarnings([])
+    setImportSelectedIndices(new Set())
+  }
+
+  function handleImportCreateSelected() {
+    const ordered = [...importSelectedIndices].sort((a, b) => a - b)
+    const payloads = ordered.map((i) => {
+      const t = importParsedTasks[i]
+      return {
+        title: t.title,
+        description: t.description,
+        priority: t.priority,
+        taskType: t.taskType,
+        owner: t.owner,
+        dueDate: t.dueDate,
+      }
+    })
+    if (!payloads.length) return
+    const created = onCreateTasks(payloads)
+    if (created > 0) closeImportModal()
+  }
 
   const filters = useMemo(
     () => ({
@@ -230,6 +450,13 @@ export default function Board({
             >
               Add task
             </button>
+            <button
+              type="button"
+              className="btn btn-secondary board-import-tasks"
+              onClick={openImportModal}
+            >
+              Import tasks
+            </button>
             <label className="template-picker" htmlFor="task-template-select">
               <span className="sr-only">Use template</span>
               <select
@@ -329,6 +556,213 @@ export default function Board({
         </div>
       </header>
 
+      {showImportModal && (
+        <div
+          className="import-modal-overlay board-form-overlay"
+          role="presentation"
+        >
+          <div
+            className="import-modal-panel board-form-panel board-form-panel--import"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="import-task-dialog-heading"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2
+              id="import-task-dialog-heading"
+              className="import-modal-heading board-modal-title"
+            >
+              Import tasks
+            </h2>
+            {importStep === 'paste' ? (
+              <>
+                <p className="import-modal-help">
+                  Paste Copilot JSON with a top-level <code>tasks</code> array.
+                  Markdown code fences and surrounding text are OK. Each task
+                  should include <code>title</code>, and can optionally include{' '}
+                  <code>description</code>, <code>priority</code>,{' '}
+                  <code>taskType</code>, <code>owner</code>,{' '}
+                  <code>dueDate</code> as <code>YYYY-MM-DD</code>, and{' '}
+                  <code>source</code>.
+                </p>
+                <div className="import-prompt-section">
+                  <button
+                    type="button"
+                    className="import-prompt-toggle"
+                    aria-expanded={showCopilotPrompt}
+                    onClick={() => setShowCopilotPrompt((v) => !v)}
+                  >
+                    {showCopilotPrompt
+                      ? 'Hide Copilot prompt'
+                      : 'Need the Copilot prompt?'}
+                  </button>
+                  {showCopilotPrompt ? (
+                    <div className="import-prompt-panel">
+                      <p className="import-prompt-help">
+                        Copy this prompt into Copilot, then paste the JSON
+                        output below.
+                      </p>
+                      <div className="import-prompt-actions">
+                        <button
+                          type="button"
+                          className="btn btn-secondary"
+                          onClick={handleCopyCopilotPrompt}
+                        >
+                          Copy prompt
+                        </button>
+                      </div>
+                      <label
+                        className="import-modal-label"
+                        htmlFor="import-copilot-prompt-textarea"
+                      >
+                        Copilot prompt for Tasklane import
+                      </label>
+                      <textarea
+                        id="import-copilot-prompt-textarea"
+                        className="import-prompt-textarea task-form-textarea"
+                        readOnly
+                        value={TASKLANE_COPILOT_IMPORT_PROMPT}
+                        spellCheck={false}
+                        rows={8}
+                      />
+                      {copyPromptStatus ? (
+                        <div
+                          role="status"
+                          className={`import-prompt-copy-status ${
+                            copyPromptStatus === 'Copied'
+                              ? 'import-prompt-copy-status--copied'
+                              : 'import-prompt-copy-status--failed'
+                          }`}
+                        >
+                          {copyPromptStatus}
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </div>
+                <label className="import-modal-label" htmlFor="import-json-textarea">
+                  Paste Copilot JSON
+                </label>
+                <textarea
+                  id="import-json-textarea"
+                  className="import-modal-textarea task-form-textarea"
+                  placeholder='{ "tasks": [ { "title": "…", "description": "…" } ] }'
+                  value={importRaw}
+                  onChange={(e) => setImportRaw(e.target.value)}
+                  rows={10}
+                  spellCheck={false}
+                />
+                <div className="import-modal-actions">
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={handleImportPreviewClick}
+                  >
+                    Preview tasks
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    onClick={closeImportModal}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                {importWarnings.length > 0 ? (
+                  <ul className="import-warning-list">
+                    {importWarnings.map((w, i) => (
+                      <li key={i}>{w}</li>
+                    ))}
+                  </ul>
+                ) : null}
+                {importParsedTasks.length === 0 ? (
+                  <p className="import-preview-empty">
+                    No valid tasks found.
+                  </p>
+                ) : (
+                  <ul className="import-preview-list">
+                    {importParsedTasks.map((t, idx) => (
+                      <li
+                        key={t.previewId || idx}
+                        className={`import-preview-item ${
+                          t.isDuplicate ? 'import-preview-item--duplicate' : ''
+                        }`}
+                      >
+                        <label className="import-preview-row">
+                          <input
+                            type="checkbox"
+                            className="import-preview-checkbox"
+                            checked={importSelectedIndices.has(idx)}
+                            onChange={() => toggleImportSelected(idx)}
+                          />
+                          <div className="import-preview-main">
+                            <span className="import-preview-title">{t.title}</span>
+                            <div className="import-preview-meta">
+                              <span
+                                className={`priority-badge priority-badge--${previewPriorityVariant(t.priority)}`}
+                              >
+                                {t.priority}
+                              </span>
+                              <span className="task-type-badge">{t.taskType}</span>
+                              <span className="import-source-label">{t.source}</span>
+                              {t.dueDate ? (
+                                <span className="import-preview-due">
+                                  Due {formatDateLabel(t.dueDate)}
+                                </span>
+                              ) : null}
+                              {t.owner ? (
+                                <span className="import-preview-owner">{t.owner}</span>
+                              ) : null}
+                            </div>
+                            {t.isDuplicate ? (
+                              <p className="import-duplicate-note">{t.duplicateReason}</p>
+                            ) : null}
+                            {t.description ? (
+                              <p className="import-preview-description">
+                                {t.description.length > 320
+                                  ? `${t.description.slice(0, 317)}…`
+                                  : t.description}
+                              </p>
+                            ) : null}
+                          </div>
+                        </label>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <div className="import-modal-actions">
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    disabled={importSelectedIndices.size === 0}
+                    onClick={handleImportCreateSelected}
+                  >
+                    Create selected tasks
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={handleImportBack}
+                  >
+                    Back
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    onClick={closeImportModal}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       {modalOpen && (
         <div
           className="board-form-overlay"
@@ -368,7 +802,7 @@ export default function Board({
       )}
       <DndContext
         sensors={sensors}
-        collisionDetection={closestCenter}
+        collisionDetection={columnAwareCollisionDetection}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
       >

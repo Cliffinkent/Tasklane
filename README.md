@@ -18,6 +18,7 @@ Tasklane demonstrates:
 - Drag and drop ordering
 - Light and dark themes
 - localStorage persistence
+- Copilot-style **paste JSON** import for backlog tasks
 
 ## Features
 
@@ -26,10 +27,12 @@ Tasklane demonstrates:
 - **Epics** — Group work, reorder epics, open epic detail, and link tasks from the board.
 - **Reusable task templates** — Manage patterns on `/templates` and quick-create from the board.
 - **Task metadata** — Type, priority, due date, owner, and optional epic link on each task.
+- **Task comments/notes** — Add and remove comments in the task edit form; board cards show comment count only.
 - **Search and filters** — Search title, description, and owner; filter by status, epic, type, and priority with clear filters.
 - **Light and dark theme** — Toggle in the sidebar; choice is persisted in the browser.
 - **Browser-local persistence** — Tasks, epics, templates, theme, and sidebar width in `localStorage`.
 - **Inline validation** — Required task, epic, and template titles surface clear errors instead of failing silently.
+- **Copilot JSON task import** — Paste structured `{ "tasks": [ … ] }` from Copilot (*Import tasks* on the board), preview and tick rows, create selected tasks in **Backlog** (browser-only; no Microsoft Graph).
 
 ## Setup and run
 
@@ -49,13 +52,41 @@ npm run preview
 
 Use `preview` to verify production output and client-side routing (for example `/epics` after refresh).
 
+## Importing tasks from Copilot output
+
+1. On the **Task Board**, choose **Import tasks** (next to **Add task** and **Use template**). In the modal, expand **Need the Copilot prompt?** to copy a Microsoft 365 Copilot prompt that asks for Tasklane-compatible JSON, or draft JSON yourself with a **`tasks`** array — see shape below.
+2. Paste the JSON under **Paste Copilot JSON**, then **Preview tasks**.
+3. Untick rows you do not want, then **Create selected tasks**. They appear in **Backlog** at the end of the column and persist via `kanban-tasks`.
+
+Invalid JSON or rows without a **`title`** are skipped with readable warnings.
+
+**Suggested JSON shape:**
+
+```json
+{
+  "tasks": [
+    {
+      "title": "Short action title",
+      "description": "Useful context from the email or Teams message",
+      "priority": "Low | Medium | High | Critical",
+      "taskType": "Discovery | Assessment | Planning | Execution | Validation | Follow-up",
+      "owner": "Person or team if known, otherwise \"\"",
+      "dueDate": "YYYY-MM-DD if explicitly stated, otherwise \"\"",
+      "source": "Email | Teams | Meeting | Other"
+    }
+  ]
+}
+```
+
+*`source`* is shown in the preview only; stored tasks match the usual fields (title, description, priority, task type, due date, owner, epic unset).
+
 ## Data storage
 
 All data is saved in **localStorage** on this machine. Keys are fixed; renaming them would orphan existing data.
 
 | Key | Contents |
 | --- | --- |
-| `kanban-tasks` | Task list (JSON): order, column, task type, priority, due date, owner, epic link, timestamps |
+| `kanban-tasks` | Task list (JSON): order, column, task type, priority, due date, owner, epic link, comment notes, timestamps |
 | `kanban-epics` | Epics list (JSON) |
 | `kanban-task-templates` | Reusable templates (JSON) |
 | `kanban-theme` | `light` or `dark` |
@@ -76,7 +107,7 @@ On load, malformed `localStorage` JSON or unexpected shapes do not crash the app
 - **Not production hardened** — Security, compliance, backups, and operational guarantees are out of scope for this PoC.
 - **Drag/drop and filtering** are intentionally lightweight (for example, active filters affect which cards are visible when choosing drop targets).
 - **No comments, activity history, or sprint model** in this PoC.
-- **No audit trail** or built-in import/export yet.
+- **No audit trail** — No standalone **backup/export/import** tool for all data as a single file yet (board paste import creates tasks only).
 
 ## Recommended next steps
 

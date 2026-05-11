@@ -32,6 +32,22 @@ function dueDisplay(isoDate) {
   return formatted || null
 }
 
+function isInteractiveElement(target, cardRoot) {
+  const interactive = target?.closest?.(
+    'button, a, input, select, textarea, label, .card-move-backdrop, .card-move-menu'
+  )
+
+  if (interactive) return true
+
+  const roleButton = target?.closest?.('[role="button"]')
+
+  if (!roleButton) return false
+
+  if (roleButton === cardRoot) return false
+
+  return true
+}
+
 function CardContent({ task, epics = [], onMove, onEdit, onDelete, isOverlay = false }) {
   const [showMoveMenu, setShowMoveMenu] = useState(false)
   const otherColumns = COLUMNS.filter((c) => c.id !== task.columnId)
@@ -44,6 +60,7 @@ function CardContent({ task, epics = [], onMove, onEdit, onDelete, isOverlay = f
   const priorityLabel = task.priority || 'Medium'
   const dueStr = dueDisplay(task.dueDate)
   const ownerStr = typeof task.owner === 'string' && task.owner.trim() ? task.owner.trim() : null
+  const commentCount = Array.isArray(task.comments) ? task.comments.length : 0
   const priorityClass = priorityCardClass(task.priority)
 
   return (
@@ -140,7 +157,7 @@ function CardContent({ task, epics = [], onMove, onEdit, onDelete, isOverlay = f
         <p className="card-description">{task.description}</p>
       ) : null}
 
-      {dueStr || ownerStr ? (
+      {dueStr || ownerStr || commentCount > 0 ? (
         <footer className="card-footer">
           {ownerStr ? (
             <span className="card-footer-item" title={ownerStr}>
@@ -153,6 +170,20 @@ function CardContent({ task, epics = [], onMove, onEdit, onDelete, isOverlay = f
               <span className="card-footer-label">Due</span>
               <span className="card-footer-value">{dueStr}</span>
             </span>
+          ) : null}
+          {commentCount > 0 ? (
+            <button
+              type="button"
+              className="card-comment-count"
+              onClick={(e) => {
+                e.stopPropagation()
+                onEdit?.(task.id)
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
+              aria-label={`Open comments for ${task.title}`}
+            >
+              💬 {commentCount}
+            </button>
           ) : null}
         </footer>
       ) : null}
@@ -173,12 +204,21 @@ export default function Card({ task, epics, onMove, onEdit, onDelete }) {
 
   const { setNodeRef: setDropRef, isOver } = useDroppable({
     id: `drop:${task.id}`,
-    data: { type: 'task', task, columnId: task.columnId },
+    data: { type: 'task', taskId: task.id, task, columnId: task.columnId },
   })
 
   function setRefs(node) {
     setDragRef(node)
     setDropRef(node)
+  }
+
+  function handleCardMouseDownCapture(event) {
+    if (event.detail !== 2) return
+    if (isDragging) return
+    if (isInteractiveElement(event.target, event.currentTarget)) return
+    event.preventDefault()
+    event.stopPropagation()
+    onEdit?.(task.id)
   }
 
   return (
@@ -187,6 +227,8 @@ export default function Card({ task, epics, onMove, onEdit, onDelete }) {
       className={`card-wrapper ${isDragging ? 'card-wrapper--dragging' : ''} ${isOver && !isDragging ? 'card-wrapper--drop-target' : ''}`}
       {...attributes}
       {...listeners}
+      title="Double-click to edit"
+      onMouseDownCapture={handleCardMouseDownCapture}
     >
       <CardContent
         task={task}
