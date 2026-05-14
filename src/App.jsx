@@ -10,6 +10,7 @@ import EpicsPage from './pages/EpicsPage'
 import EpicDetailPage from './pages/EpicDetailPage'
 import TemplatesPage from './pages/TemplatesPage'
 import DropZone from './pages/DropZone'
+import ClipboardToast from './components/ClipboardToast'
 import { COLUMN_IDS } from './data/columns'
 import {
   normaliseTaskType,
@@ -580,9 +581,13 @@ function App() {
               />
             }
           />
-          <Route path="dropzone" element={<DropZone tasks={tasks} />} />
+          <Route
+            path="dropzone"
+            element={<DropZone tasks={tasks} addBoardTasks={handleCreateTasks} />}
+          />
         </Route>
       </Routes>
+      <ClipboardToast />
       {deletedForUndo && (
         <div className="undo-toast" role="status">
           <span className="undo-toast-message">Task deleted</span>

@@ -87,6 +87,8 @@ export default function DropZoneTaskPreview({
   destination,
   onDestinationChange,
   onClearList,
+  onAddToBoard,
+  onExportToThings,
 }) {
   const [expandedDescIds, setExpandedDescIds] = useState(() => new Set())
 
@@ -125,10 +127,21 @@ export default function DropZoneTaskPreview({
     )
   }
 
-  const primaryCtaLabel =
-    destination === DESTINATION_THINGS3
-      ? 'Export to Things 3'
-      : 'Add to Board'
+  const hasSelection = displayTasks.some((t) => t.selected)
+  const addToBoardEnabled =
+    destination === DESTINATION_TASKLANE && hasSelection
+  const exportThingsEnabled =
+    destination === DESTINATION_THINGS3 && hasSelection
+
+  function handleAddToBoardClick() {
+    if (!addToBoardEnabled) return
+    onAddToBoard?.()
+  }
+
+  function handleExportToThingsClick() {
+    if (!exportThingsEnabled) return
+    onExportToThings?.()
+  }
 
   return (
     <section
@@ -307,14 +320,25 @@ export default function DropZoneTaskPreview({
 
       <div className="dropzone-preview-footer">
         <DestinationToggle value={destination} onChange={onDestinationChange} />
-        <button
-          type="button"
-          className="btn btn-primary btn--compact"
-          disabled
-          title="Coming soon"
-        >
-          {primaryCtaLabel}
-        </button>
+        {destination === DESTINATION_TASKLANE ? (
+          <button
+            type="button"
+            className="btn btn-primary btn--compact"
+            disabled={!addToBoardEnabled}
+            onClick={handleAddToBoardClick}
+          >
+            Add to Board
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="btn btn-primary btn--compact"
+            disabled={!exportThingsEnabled}
+            onClick={handleExportToThingsClick}
+          >
+            Export to Things 3
+          </button>
+        )}
       </div>
     </section>
   )

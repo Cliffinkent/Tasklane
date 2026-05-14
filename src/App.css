@@ -354,6 +354,23 @@
   color: var(--text-heading);
 }
 
+.clipboard-toast {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-10);
+  z-index: 56;
+}
+
+.clipboard-toast-message {
+  margin: 0;
+}
+
+.dropzone-board-toast {
+  bottom: calc(var(--space-24) + 3.25rem);
+  z-index: 54;
+}
+
 .btn-undo {
   background: var(--text-muted);
   color: var(--bg-page);
