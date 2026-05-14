@@ -2,7 +2,7 @@
 
 Work in the Tasklane.
 
-A browser-local agile task tracking board built with React and Vite.
+A browser-local agile task tracking board built with React and Vite. The same UI can run in the **browser** or inside an **Electron** desktop shell for clipboard-assisted Copilot JSON import.
 
 **Developer handoff** (routes, data model, `localStorage`, UX decisions, backlog): [`HANDOFF.md`](HANDOFF.md). This README stays user- and operator-focused.
 
@@ -17,8 +17,10 @@ Tasklane demonstrates:
 - Search and filtering
 - Drag and drop ordering
 - Light and dark themes
-- localStorage persistence
-- Copilot-style **paste JSON** import for backlog tasks
+- `localStorage` persistence
+- **Drop Zone** — dedicated `/dropzone` flow to paste Copilot JSON, preview and edit tasks, add to backlog, export to **Things 3**, and review **import/export history**
+- **Board import modal** — lightweight paste + preview + create; optional clipboard prefill and a link to the full Drop Zone
+- Optional **Electron** build with a clipboard watcher that nudges you when task-shaped JSON appears on the clipboard
 
 ## Features
 
@@ -32,9 +34,9 @@ Tasklane demonstrates:
 - **Light and dark theme** — Toggle in the sidebar; choice is persisted in the browser.
 - **Browser-local persistence** — Tasks, epics, templates, theme, and sidebar width in `localStorage`.
 - **Inline validation** — Required task, epic, and template titles surface clear errors instead of failing silently.
-- **Copilot JSON task import** — Paste structured `{ "tasks": [ … ] }` from Copilot (*Import tasks* on the board), preview and tick rows, create selected tasks in **Backlog** (browser-only; no Microsoft Graph).
+- **Copilot JSON import** — Shared parser tolerates BOM, markdown fences, and flexible title fields. Import via **Import tasks** on the board or the full **Drop Zone** experience (`/dropzone`). No Microsoft Graph; JSON only.
 
-## Setup and run
+## Setup and run (web)
 
 ```bash
 npm install
@@ -43,6 +45,18 @@ npm run dev
 
 Open the URL shown in the terminal (usually `http://localhost:5173`).
 
+## Desktop (Electron)
+
+The repo includes an Electron main process (`electron/main.mjs`) and preload (`electron/preload.mjs`) that load the Vite app. The main process can poll the system clipboard (when enabled) and surface a toast in the app when Copilot-style task JSON is detected.
+
+| Command | Description |
+| --- | --- |
+| `npm run desktop:dev` | Runs Vite on port 5173 and opens Electron against the dev server (uses `concurrently` + `wait-on`). |
+| `npm run desktop:dist` | Production Vite build, then Electron loads `dist/index.html`. |
+| `npm run desktop` | Electron only; expects a build or dev server per your workflow. |
+
+**Drop Zone settings** (sidebar, bottom): Things 3 **project / list ID** is stored in `localStorage` (`tasklane-dropzone-things3-listid`). In Electron, **Clipboard watcher** on/off is stored under the app user data folder in `tasklane-settings.json` and applied on launch.
+
 ## Build check
 
 ```bash
@@ -50,15 +64,24 @@ npm run build
 npm run preview
 ```
 
-Use `preview` to verify production output and client-side routing (for example `/epics` after refresh).
+Use `preview` to verify production output and client-side routing (for example `/epics` or `/dropzone` after refresh).
 
 ## Importing tasks from Copilot output
 
-1. On the **Task Board**, choose **Import tasks** (next to **Add task** and **Use template**). In the modal, expand **Need the Copilot prompt?** to copy a Microsoft 365 Copilot prompt that asks for Tasklane-compatible JSON, or draft JSON yourself with a **`tasks`** array — see shape below.
-2. Paste the JSON under **Paste Copilot JSON**, then **Preview tasks**.
-3. Untick rows you do not want, then **Create selected tasks**. They appear in **Backlog** at the end of the column and persist via `kanban-tasks`.
+### Board (quick path)
 
-Invalid JSON or rows without a **`title`** are skipped with readable warnings.
+1. On the **Task Board**, choose **Import tasks** (next to **Add task** and **Use template**). In the modal, expand **Need the Copilot prompt?** to copy a Microsoft 365 Copilot prompt that asks for Tasklane-compatible JSON, or draft JSON yourself with a **`tasks`** array (or a top-level JSON array of task objects — see Drop Zone below).
+2. If the clipboard already contains valid task JSON when the modal opens, the textarea may prefill and a short notice appears.
+3. Paste or adjust the JSON, then **Preview tasks**. Untick rows you do not want, then **Create selected tasks**. They appear in **Backlog** at the end of the column.
+4. **Need more options?** → **Open Drop Zone** closes the modal and navigates to `/dropzone` (clipboard JSON can be passed through so Drop Zone opens with the same text).
+
+### Drop Zone (full path)
+
+1. Open **Drop Zone** from the sidebar (`/dropzone`).
+2. Use the **Import** tab: prompt shelf (editable per destination), paste area, **Parse** / auto-parse, then an editable preview. Send checked tasks to the board (**Add to Board**) or **Export to Things 3** (builds a `things:///json?...` URL; Electron opens it via the shell helper).
+3. Use the **History** tab to see recent board imports and Things exports stored in `localStorage`, with optional **Clear history**.
+
+Invalid JSON or rows without a usable **title** are skipped with readable errors or warnings.
 
 **Suggested JSON shape:**
 
@@ -78,11 +101,11 @@ Invalid JSON or rows without a **`title`** are skipped with readable warnings.
 }
 ```
 
-*`source`* is shown in the preview only; stored tasks match the usual fields (title, description, priority, task type, due date, owner, epic unset).
+*`source`* is shown in previews where relevant; stored board tasks use the usual fields (title, description, priority, task type, due date, owner, epic unset).
 
 ## Data storage
 
-All data is saved in **localStorage** on this machine. Keys are fixed; renaming them would orphan existing data.
+All web data is saved in **localStorage** on this machine for the site origin. Keys are fixed; renaming them would orphan existing data.
 
 | Key | Contents |
 | --- | --- |
@@ -91,30 +114,35 @@ All data is saved in **localStorage** on this machine. Keys are fixed; renaming 
 | `kanban-task-templates` | Reusable templates (JSON) |
 | `kanban-theme` | `light` or `dark` |
 | `kanban-sidebar-width` | Sidebar width in pixels (desktop) |
+| `tasklane-dropzone-history` | Drop Zone import/export log ( capped list; JSON array ) |
+| `tasklane-dropzone-things3-listid` | Optional Things 3 list / project id for exports |
+| `tasklane-dropzone-things3-tags` | Optional tag map JSON for Things exports |
+| `tasklane-dropzone-prompt-tasklane` / `tasklane-dropzone-prompt-things3` | Editable Copilot prompt text for the Drop Zone shelf |
 
-Clear site data for this origin in the browser to reset the app.
+Clear site data for this origin in the browser to reset the app (Electron user data is separate for shell settings).
 
 On load, malformed `localStorage` JSON or unexpected shapes do not crash the app: tasks and epics fall back to empty lists; invalid rows are skipped. Templates default to the built-in seed list when the key is missing or empty; corrupt template JSON yields an empty list until you add templates again. Task types **Migration** and **Day 2** map to **Execution** and **Follow-up** respectively. Other unknown task types are normalised when data is loaded or saved.
 
 ## PoC scope and limitations
 
-- **Browser-local only** — No server; data stays on the device unless you copy or export it yourself.
+- **Browser-local only (web)** — No server; data stays on the device unless you copy or export it yourself.
 - **No backend** — No API, sync, or collaboration service.
 - **No accounts** — No authentication or per-user storage.
 - **No cross-device sync** — Each browser profile has its own `localStorage`.
 - **No role-based permissions** — Anyone with access to the browser profile can read or change stored data.
-- **localStorage** can be cleared by the browser or the user; there is no built-in recovery or backup.
+- **localStorage** can be cleared by the browser or the user; there is no built-in recovery or backup for the full dataset.
 - **Not production hardened** — Security, compliance, backups, and operational guarantees are out of scope for this PoC.
 - **Drag/drop and filtering** are intentionally lightweight (for example, active filters affect which cards are visible when choosing drop targets).
-- **No comments, activity history, or sprint model** in this PoC.
-- **No audit trail** — No standalone **backup/export/import** tool for all data as a single file yet (board paste import creates tasks only).
+- **No activity feed or sprint model** in this PoC.
+- **No audit trail** for task edits — Drop Zone **history** only logs import/export events from that page, not general board changes.
+- **No single-file backup/export** for all app data yet (imports create tasks; Things export is outbound only).
 
 ## Recommended next steps
 
 Short-term product ideas (see **`HANDOFF.md`** for a longer ordered engineering backlog):
 
 1. Approvals or ownership models beyond a single optional owner field.
-2. JSON import/export.
+2. Full JSON or CSV backup/export for tasks, epics, and templates.
 3. Keyboard-accessible reorder shortcuts beyond the Move menu.
 4. Multi-select or bulk actions.
 5. A backend only if sync or collaboration becomes a requirement.
@@ -130,27 +158,32 @@ Short-term product ideas (see **`HANDOFF.md`** for a longer ordered engineering 
 | `npm run dev` | Dev server with hot reload |
 | `npm run build` | Production build to `dist/` |
 | `npm run preview` | Preview the production build locally |
+| `npm run desktop:dev` | Vite + Electron for local desktop development |
+| `npm run desktop:dist` | Build SPA then run Electron against `dist/` |
 
 ## Tech stack
 
 - [React 18](https://react.dev/)
 - [Vite 5](https://vitejs.dev/)
-- [React Router](https://reactrouter.com/) — `/` (board), `/epics`, `/epics/:epicId`, `/templates`
+- [React Router](https://reactrouter.com/) — `/` (board), `/epics`, `/epics/:epicId`, `/templates`, `/dropzone`
+- [Electron](https://www.electronjs.org/) — optional desktop shell (dev and packaged workflows in `package.json`)
 - [@dnd-kit](https://dndkit.com/) — drag and drop
 
 ## Project layout (high level)
 
-- `src/App.jsx` — Routes, task/epic/template state, reposition helpers, undo delete
-- `src/components/` — Board, columns, cards, layout, forms
-- `src/pages/` — Epics, epic detail, templates
+- `src/App.jsx` — Routes, task/epic/template state, reposition helpers, undo delete, clipboard toast host
+- `src/components/` — Board, columns, cards, layout, forms, **ClipboardToast**, **DropZone**\* pieces
+- `src/pages/` — Epics, epic detail, templates, **DropZone**
 - `src/hooks/` — `useLocalStorage`, `useEpicsStorage`, `useTemplatesStorage`, `useTheme`
 - `src/data/taskMetadata.js` — Task types, priorities, built-in template seed definitions
+- `src/utils/parseDropZoneJSON.js` — Shared Copilot / Things JSON parsing for Drop Zone and board import
+- `electron/main.mjs`, `electron/preload.mjs` — Desktop shell, clipboard helper, Things URL open helper
 - `public/_redirects` — SPA fallback for Netlify (see Deployment)
 - `vercel.json` — SPA fallback for Vercel (see Deployment)
 
 ## Deployment
 
-The app is a static SPA: run `npm run build` and deploy the `dist/` folder. Because React Router uses the History API, the host must serve `index.html` for unknown paths (so `/epics` works on refresh).
+The app is a static SPA: run `npm run build` and deploy the `dist/` folder. Because React Router uses the History API, the host must serve `index.html` for unknown paths (so `/epics` and `/dropzone` work on refresh).
 
 ### Netlify
 
@@ -189,7 +222,7 @@ npm run build
 npm run preview
 ```
 
-Visit the printed URL and try `/epics` and a direct refresh to confirm routing works.
+Visit the printed URL and try `/epics`, `/dropzone`, and a direct refresh to confirm routing works.
 
 ## License
 
