@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { NavLink, Outlet, useLocation, matchPath } from 'react-router-dom'
+import DropZoneSidebarSettings from './DropZoneSidebarSettings'
 
 const STORAGE_KEY = 'kanban-sidebar-width'
 const MIN_W = 140
@@ -34,6 +35,13 @@ function getPageHeaderMeta(pathname) {
     return {
       title: 'Templates',
       subtitle: 'Create reusable task patterns for recurring work.',
+    }
+  }
+  if (matchPath({ path: '/dropzone', end: true }, pathname)) {
+    return {
+      title: 'Drop Zone',
+      subtitle:
+        'Paste JSON from Copilot to preview, edit, and import tasks to your board or export to Things 3.',
     }
   }
   return { title: 'Tasklane', subtitle: null }
@@ -109,8 +117,13 @@ export default function AppLayout({ theme, onToggleTheme }) {
           <NavLink to="/templates" className="sidebar-link">
             Templates
           </NavLink>
+          <div className="sidebar-nav-divider" aria-hidden="true" />
+          <NavLink to="/dropzone" className="sidebar-link">
+            Drop Zone
+          </NavLink>
         </nav>
         <div className="sidebar-footer">
+          <DropZoneSidebarSettings />
           <button
             type="button"
             className="theme-toggle theme-toggle--sidebar"
