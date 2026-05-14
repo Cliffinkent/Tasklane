@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { NavLink, Outlet, useLocation, matchPath } from 'react-router-dom'
+import DropZoneSidebarSettings from './DropZoneSidebarSettings'
 
 const STORAGE_KEY = 'kanban-sidebar-width'
 const MIN_W = 140
@@ -122,6 +123,7 @@ export default function AppLayout({ theme, onToggleTheme }) {
           </NavLink>
         </nav>
         <div className="sidebar-footer">
+          <DropZoneSidebarSettings />
           <button
             type="button"
             className="theme-toggle theme-toggle--sidebar"

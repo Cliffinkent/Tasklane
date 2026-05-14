@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   DndContext,
   DragOverlay,
@@ -21,7 +22,7 @@ import {
 import Column from './Column'
 import TaskForm from './TaskForm'
 import Card, { CardContent } from './Card'
-import { parseTaskImport } from '../utils/parseTaskImport'
+import { parseDropZoneJSON } from '../utils/parseDropZoneJSON'
 import { normaliseImportTitle } from '../utils/normaliseImportTitle'
 import { formatDateLabel } from '../utils/formatDateLabel'
 
@@ -190,7 +191,9 @@ export default function Board({
   )
   const [showCopilotPrompt, setShowCopilotPrompt] = useState(false)
   const [copyPromptStatus, setCopyPromptStatus] = useState('')
+  const [importClipboardDetected, setImportClipboardDetected] = useState(false)
 
+  const navigate = useNavigate()
   const modalOpen = showForm || Boolean(editingTaskId)
 
   function resetImportModal() {
@@ -199,6 +202,7 @@ export default function Board({
     setImportParsedTasks([])
     setImportWarnings([])
     setImportSelectedIndices(new Set())
+    setImportClipboardDetected(false)
   }
 
   function closeImportModal() {
@@ -233,8 +237,71 @@ export default function Board({
     setImportStep('paste')
   }
 
+  function handleOpenDropZone() {
+    const state =
+      importClipboardDetected && importRaw.trim()
+        ? { clipboardJSON: importRaw.trim() }
+        : undefined
+    closeImportModal()
+    navigate('/dropzone', state ? { state } : {})
+  }
+  useEffect(() => {
+    if (!showImportModal) return undefined
+
+    let cancelled = false
+
+    async function readClipboardText() {
+      try {
+        const apiRead = window.electronAPI?.readClipboard
+        if (typeof apiRead === 'function') {
+          const v = await Promise.resolve(apiRead())
+          if (typeof v === 'string' && v.trim()) return v
+        }
+      } catch {
+        // ignore
+      }
+      try {
+        if (navigator.clipboard?.readText) {
+          return await navigator.clipboard.readText()
+        }
+      } catch {
+        // ignore
+      }
+      return ''
+    }
+
+    ;(async () => {
+      try {
+        const raw = await readClipboardText()
+        if (cancelled) return
+        const trimmed = String(raw ?? '').trim().replace(/^\uFEFF/, '')
+        if (!trimmed) return
+        const r = parseDropZoneJSON(trimmed)
+        if (r.errors.length > 0 || r.tasks.length === 0) return
+        let applied = false
+        setImportRaw((prev) => {
+          if (prev.trim()) return prev
+          applied = true
+          return trimmed
+        })
+        if (applied) setImportClipboardDetected(true)
+      } catch {
+        // silent
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [showImportModal])
+
   function handleImportPreviewClick() {
-    const { tasks: parsedTasks, warnings } = parseTaskImport(importRaw)
+    const r = parseDropZoneJSON(importRaw)
+    const warnings = [...r.errors]
+    const parsedTasks = r.tasks.map(({ id: _dzId, selected: _sel, ...rest }) => rest)
+    if (parsedTasks.length === 0 && warnings.length === 0) {
+      warnings.push('No valid tasks found.')
+    }
     const existingNormalisedTitles = new Set(
       tasks
         .map((t) => normaliseImportTitle(t.title))
@@ -635,6 +702,14 @@ export default function Board({
                 <label className="import-modal-label" htmlFor="import-json-textarea">
                   Paste Copilot JSON
                 </label>
+                {importClipboardDetected ? (
+                  <div
+                    role="status"
+                    className="import-prompt-copy-status import-prompt-copy-status--clipboard"
+                  >
+                    JSON detected on clipboard — preview below.
+                  </div>
+                ) : null}
                 <textarea
                   id="import-json-textarea"
                   className="import-modal-textarea task-form-textarea"
@@ -644,6 +719,16 @@ export default function Board({
                   rows={10}
                   spellCheck={false}
                 />
+                <p className="import-modal-dropzone-hint">
+                  Need more options?{' '}
+                  <button
+                    type="button"
+                    className="import-modal-dropzone-link"
+                    onClick={handleOpenDropZone}
+                  >
+                    Open Drop Zone →
+                  </button>
+                </p>
                 <div className="import-modal-actions">
                   <button
                     type="button"

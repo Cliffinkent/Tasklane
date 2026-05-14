@@ -219,7 +219,7 @@ function buildNormalisedTask(row, detectedFormat) {
 }
 
 /**
- * Parse Drop Zone JSON (Tasklane / Things / mixed cleanup).
+ * Canonical parser for Copilot / Things JSON used by Drop Zone and the Board import modal.
  * @param {string} input
  * @returns {{ tasks: Array<object>, detectedFormat: 'tasklane' | 'things' | 'unknown', errors: string[] }}
  */

@@ -61,12 +61,8 @@ export default function ClipboardToast() {
   }
 
   return (
-    <div
-      className="taskdrop-import-toast clipboard-toast"
-      role="status"
-      aria-live="polite"
-    >
-      <p className="taskdrop-import-toast-message clipboard-toast-message">
+    <div className="clipboard-toast" role="status" aria-live="polite">
+      <p className="clipboard-toast-message">
         Tasks detected on clipboard
       </p>
       <div className="clipboard-toast-actions">

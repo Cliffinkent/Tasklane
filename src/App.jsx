@@ -208,9 +208,7 @@ function App() {
   const [templates, setTemplates] = useTemplatesStorage()
   const [theme, toggleTheme] = useTheme()
   const [deletedForUndo, setDeletedForUndo] = useState(null)
-  const [taskdropToast, setTaskdropToast] = useState(null)
   const undoTimerRef = useRef(null)
-  const handleCreateTasksRef = useRef(null)
 
   function handleCreate(data) {
     const trimmed = (data.title || '').trim()
@@ -268,8 +266,6 @@ function App() {
     })
     return createdCount
   }
-
-  handleCreateTasksRef.current = handleCreateTasks
 
   function handleRepositionTask(activeTaskId, overId) {
     setTasks((prev) => {
@@ -450,48 +446,6 @@ function App() {
     }
   }, [])
 
-  useEffect(() => {
-    if (!taskdropToast) return undefined
-    const t = setTimeout(() => setTaskdropToast(null), 5000)
-    return () => clearTimeout(t)
-  }, [taskdropToast])
-
-  useEffect(() => {
-    const api =
-      typeof window !== 'undefined' ? window.tasklaneImportBridge : null
-    if (!api?.onPendingImport) {
-      const inElectron =
-        typeof navigator !== 'undefined' && /Electron/i.test(navigator.userAgent)
-      if (inElectron) {
-        console.warn(
-          '[Tasklane import] window.tasklaneImportBridge is missing — preload may have failed to load. File import will not work until this is fixed.'
-        )
-      }
-      return undefined
-    }
-    const unsub = api.onPendingImport((payload) => {
-      const filePath =
-        typeof payload?.filePath === 'string' ? payload.filePath : ''
-      const items = payload?.items
-      let n = 0
-      try {
-        n = handleCreateTasksRef.current?.(items) ?? 0
-      } catch (err) {
-        console.warn('[Tasklane import] Failed to create tasks from file', err)
-      } finally {
-        if (filePath) {
-          if (n > 0) {
-            setTaskdropToast(`Imported ${n} tasks from Taskdrop`)
-          }
-          api.notifyImportHandled({ filePath, success: n > 0 })
-        } else {
-          console.warn('[Tasklane import] Ignoring import payload without filePath')
-        }
-      }
-    })
-    return unsub
-  }, [])
-
   function clearUndoTimer() {
     if (undoTimerRef.current) {
       clearTimeout(undoTimerRef.current)
@@ -598,11 +552,6 @@ function App() {
           >
             Undo
           </button>
-        </div>
-      )}
-      {taskdropToast && (
-        <div className="taskdrop-import-toast" role="status">
-          <span className="taskdrop-import-toast-message">{taskdropToast}</span>
         </div>
       )}
     </>

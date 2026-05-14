@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
+import DropZoneHistory from '../components/DropZoneHistory'
 import DropZonePromptShelf from '../components/DropZonePromptShelf'
 import DropZonePasteArea from '../components/DropZonePasteArea'
 import DropZoneTaskPreview from '../components/DropZoneTaskPreview'
@@ -54,6 +55,7 @@ export default function DropZone({ tasks: boardTasks = [], addBoardTasks }) {
   const [previewOpen, setPreviewOpen] = useState(false)
   const [dropTasks, setDropTasks] = useState([])
   const [boardToast, setBoardToast] = useState(null)
+  const [activeTab, setActiveTab] = useState('import')
 
   const clearPreview = useCallback(() => {
     setPreviewOpen(false)
@@ -261,41 +263,69 @@ export default function DropZone({ tasks: boardTasks = [], addBoardTasks }) {
     <>
       <div className="dropzone-page">
         <div className="dropzone-workspace">
-          <DropZonePromptShelf
-            destination={destination}
-            onDestinationChange={setDestination}
-          />
-          <DropZonePasteArea
-            pasteText={pasteText}
-            onPasteTextChange={handlePasteTextChange}
-            parseError={parseError}
-            parsedLocked={previewOpen}
-            onParse={handleParse}
-            onPastedMaybeAutoParse={tryAutoParse}
-          />
-          {!previewOpen ? (
-            <div className="empty-state" role="status">
-              <div className="empty-state-inner">
-                <div className="empty-state-panel">
-                  <p className="empty-state-message">
-                    Copy JSON from Copilot to get started.
-                  </p>
+          <div
+            className="destination-toggle dropzone-workspace-tabs"
+            role="tablist"
+            aria-label="Drop zone section"
+          >
+            <button
+              type="button"
+              className="destination-toggle__segment"
+              aria-pressed={activeTab === 'import'}
+              onClick={() => setActiveTab('import')}
+            >
+              Import
+            </button>
+            <button
+              type="button"
+              className="destination-toggle__segment"
+              aria-pressed={activeTab === 'history'}
+              onClick={() => setActiveTab('history')}
+            >
+              History
+            </button>
+          </div>
+          {activeTab === 'import' ? (
+            <>
+              <DropZonePromptShelf
+                destination={destination}
+                onDestinationChange={setDestination}
+              />
+              <DropZonePasteArea
+                pasteText={pasteText}
+                onPasteTextChange={handlePasteTextChange}
+                parseError={parseError}
+                parsedLocked={previewOpen}
+                onParse={handleParse}
+                onPastedMaybeAutoParse={tryAutoParse}
+              />
+              {!previewOpen ? (
+                <div className="empty-state" role="status">
+                  <div className="empty-state-inner">
+                    <div className="empty-state-panel">
+                      <p className="empty-state-message">
+                        Copy JSON from Copilot to get started.
+                      </p>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
-          ) : null}
-          {previewOpen && dropTasks.length > 0 ? (
-            <DropZoneTaskPreview
-              tasks={dropTasks}
-              setTasks={setDropTasks}
-              boardTasks={boardTasks}
-              destination={destination}
-              onDestinationChange={setDestination}
-              onClearList={clearPreview}
-              onAddToBoard={handleImportToBoard}
-              onExportToThings={handleExportToThings}
-            />
-          ) : null}
+              ) : null}
+              {previewOpen && dropTasks.length > 0 ? (
+                <DropZoneTaskPreview
+                  tasks={dropTasks}
+                  setTasks={setDropTasks}
+                  boardTasks={boardTasks}
+                  destination={destination}
+                  onDestinationChange={setDestination}
+                  onClearList={clearPreview}
+                  onAddToBoard={handleImportToBoard}
+                  onExportToThings={handleExportToThings}
+                />
+              ) : null}
+            </>
+          ) : (
+            <DropZoneHistory isActive={activeTab === 'history'} />
+          )}
         </div>
       </div>
       {boardToast?.type === 'success' ? (
