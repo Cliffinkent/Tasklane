@@ -9,6 +9,7 @@ import Board from './components/Board'
 import EpicsPage from './pages/EpicsPage'
 import EpicDetailPage from './pages/EpicDetailPage'
 import TemplatesPage from './pages/TemplatesPage'
+import DropZone from './pages/DropZone'
 import { COLUMN_IDS } from './data/columns'
 import {
   normaliseTaskType,
@@ -579,6 +580,7 @@ function App() {
               />
             }
           />
+          <Route path="dropzone" element={<DropZone tasks={tasks} />} />
         </Route>
       </Routes>
       {deletedForUndo && (

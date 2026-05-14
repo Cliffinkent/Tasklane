@@ -36,6 +36,13 @@ function getPageHeaderMeta(pathname) {
       subtitle: 'Create reusable task patterns for recurring work.',
     }
   }
+  if (matchPath({ path: '/dropzone', end: true }, pathname)) {
+    return {
+      title: 'Drop Zone',
+      subtitle:
+        'Paste JSON from Copilot to preview, edit, and import tasks to your board or export to Things 3.',
+    }
+  }
   return { title: 'Tasklane', subtitle: null }
 }
 
@@ -108,6 +115,10 @@ export default function AppLayout({ theme, onToggleTheme }) {
           </NavLink>
           <NavLink to="/templates" className="sidebar-link">
             Templates
+          </NavLink>
+          <div className="sidebar-nav-divider" aria-hidden="true" />
+          <NavLink to="/dropzone" className="sidebar-link">
+            Drop Zone
           </NavLink>
         </nav>
         <div className="sidebar-footer">

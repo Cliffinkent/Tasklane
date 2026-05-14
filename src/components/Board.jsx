@@ -22,6 +22,7 @@ import Column from './Column'
 import TaskForm from './TaskForm'
 import Card, { CardContent } from './Card'
 import { parseTaskImport } from '../utils/parseTaskImport'
+import { normaliseImportTitle } from '../utils/normaliseImportTitle'
 import { formatDateLabel } from '../utils/formatDateLabel'
 
 const TASKLANE_COPILOT_IMPORT_PROMPT = `You are helping me maintain my Tasklane agile task board.
@@ -70,15 +71,6 @@ function previewPriorityVariant(p) {
     default:
       return 'medium'
   }
-}
-
-function normaliseImportTitle(value) {
-  return String(value || '')
-    .toLowerCase()
-    .replace(/[-_]/g, ' ')
-    .replace(/[.,:;!?"'()[\]{}]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim()
 }
 
 function sortTasksByOrder(tasks) {

@@ -1,0 +1,8 @@
+/** Default Copilot prompts for Drop Zone (editable; persisted in localStorage). */
+
+export const DROPZONE_PROMPT_STORAGE_TASKLANE = 'tasklane-dropzone-prompt-tasklane'
+export const DROPZONE_PROMPT_STORAGE_THINGS3 = 'tasklane-dropzone-prompt-things3'
+
+export const DEFAULT_DROPZONE_PROMPT_TASKLANE = `You are helping me maintain my Tasklane agile task board. Review my recent emails and Teams messages and identify concrete actions I need to track. Return JSON only. Do not include markdown, commentary, headings, or explanations. Use this exact schema: {"tasks":[{"title":"Short action title","description":"Useful context from the email or Teams message","priority":"Low | Medium | High | Critical","taskType":"Discovery | Assessment | Planning | Execution | Validation | Follow-up","owner":"Person or team if explicitly known, otherwise empty string","dueDate":"YYYY-MM-DD if explicitly stated, otherwise empty string","source":"Email | Teams | Meeting | Other"}]} Rules: Only include concrete actions, commitments, follow-ups, blockers, or decisions that need tracking. Do not include general updates unless they require action. Do not invent due dates. Do not invent owners. Keep titles concise and action-oriented. Put useful context in the description. Use priority Medium unless the message clearly indicates urgency or impact. Return valid JSON only.`
+
+export const DEFAULT_DROPZONE_PROMPT_THINGS3 = `Anything come in or happen since 3pm yesterday I need to be aware of or action? Then: 1. Prioritise actions by urgency (🔴 High / 🟡 Medium / 🟢 Low). 2. Return the actions as JSON only. No markdown fencing. Use this schema: {"tasks":[{"title":"...","description":"...","priority":"high|medium|low","source":"email|teams|meeting"}]}`
