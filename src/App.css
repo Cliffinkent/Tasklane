@@ -326,6 +326,27 @@
   color: var(--text-muted);
 }
 
+.taskdrop-import-toast {
+  position: fixed;
+  bottom: calc(var(--space-24) + 3.25rem);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: var(--space-12) var(--space-20);
+  background: var(--bg-surface);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+  border: 1px solid var(--accent);
+  z-index: 55;
+  animation: undo-toast-in 0.25s ease;
+  max-width: min(90vw, 28rem);
+}
+
+.taskdrop-import-toast-message {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-heading);
+}
+
 .btn-undo {
   background: var(--text-muted);
   color: var(--bg-page);

@@ -4,7 +4,7 @@ import {
   TASK_TYPES,
   DEFAULT_PRIORITY,
   DEFAULT_TASK_TYPE,
-} from '../data/taskMetadata'
+} from '../data/taskMetadata.js'
 
 const TITLE_MAX = 120
 const DESCRIPTION_MAX = 1000
@@ -112,6 +112,28 @@ function normaliseImportTaskType(raw, warnings, rowLabel) {
 }
 
 /**
+ * Parse Taskdrop export files: a JSON array of tasks, or the same object shape as paste import.
+ * @param {string} text Full file contents
+ * @returns {{ tasks: Array<{title: string, description: string, priority: string, taskType: string, owner: string, dueDate: string, source: string}>, warnings: string[] }}
+ */
+export function parseTaskdropFileContent(text) {
+  const raw = String(text ?? '').replace(/^\uFEFF/, '').trim()
+  if (!raw.length) {
+    return { tasks: [], warnings: ['Empty file.'] }
+  }
+  let parsed
+  try {
+    parsed = JSON.parse(raw)
+  } catch {
+    return parseTaskImport(raw)
+  }
+  if (Array.isArray(parsed)) {
+    return parseTaskImport(JSON.stringify({ tasks: parsed }))
+  }
+  return parseTaskImport(raw)
+}
+
+/**
  * @param {string} input Raw pasted JSON string
  * @returns {{ tasks: Array<{title: string, description: string, priority: string, taskType: string, owner: string, dueDate: string, source: string}>, warnings: string[] }}
  */
@@ -161,9 +183,25 @@ export function parseTaskImport(input) {
       return
     }
 
-    let titleRaw = String(row.title ?? '').trim()
+    const titleCandidates = [
+      row.title,
+      row.name,
+      row.subject,
+      row.summary,
+      row.taskTitle,
+      row.TaskTitle,
+      row.task_name,
+    ]
+    let titleRaw = ''
+    for (const c of titleCandidates) {
+      const t = String(c ?? '').trim()
+      if (t) {
+        titleRaw = t
+        break
+      }
+    }
     if (!titleRaw) {
-      warnings.push(`${rowLabel} Skipped (title is empty).`)
+      warnings.push(`${rowLabel} Skipped (no title; expected title, name, subject, or summary).`)
       return
     }
 
