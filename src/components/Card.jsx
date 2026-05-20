@@ -48,7 +48,15 @@ function isInteractiveElement(target, cardRoot) {
   return true
 }
 
-function CardContent({ task, epics = [], onMove, onEdit, onDelete, isOverlay = false }) {
+function CardContent({
+  task,
+  epics = [],
+  onMove,
+  onEdit,
+  onDelete,
+  onArchive,
+  isOverlay = false,
+}) {
   const [showMoveMenu, setShowMoveMenu] = useState(false)
   const otherColumns = COLUMNS.filter((c) => c.id !== task.columnId)
   const epic = task.epicId ? epics.find((e) => e.id === task.epicId) : null
@@ -135,6 +143,20 @@ function CardContent({ task, epics = [], onMove, onEdit, onDelete, isOverlay = f
             >
               Edit
             </button>
+            {onArchive ? (
+              <button
+                type="button"
+                className="card-archive-btn"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onArchive()
+                }}
+                onPointerDown={(e) => e.stopPropagation()}
+                aria-label={`Archive ${(task.title || '').trim() || 'task'}`}
+              >
+                Archive
+              </button>
+            ) : null}
             <button
               type="button"
               className="card-delete-btn"
@@ -191,7 +213,7 @@ function CardContent({ task, epics = [], onMove, onEdit, onDelete, isOverlay = f
   )
 }
 
-export default function Card({ task, epics, onMove, onEdit, onDelete }) {
+export default function Card({ task, epics, onMove, onEdit, onDelete, onArchive }) {
   const {
     attributes,
     listeners,
@@ -236,6 +258,7 @@ export default function Card({ task, epics, onMove, onEdit, onDelete }) {
         onMove={onMove}
         onEdit={onEdit}
         onDelete={onDelete}
+        onArchive={onArchive}
       />
     </div>
   )

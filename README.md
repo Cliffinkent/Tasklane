@@ -4,7 +4,7 @@ Work in the Tasklane.
 
 A browser-local agile task tracking board built with React and Vite. The same UI can run in the **browser** or inside an **Electron** desktop shell for clipboard-assisted Copilot JSON import.
 
-**Developer handoff** (routes, data model, `localStorage`, UX decisions, backlog): [`HANDOFF.md`](HANDOFF.md). This README stays user- and operator-focused.
+**Developer handoff** (routes, data model, `localStorage`, architecture notes): [`SOURCE_REVIEW.md`](SOURCE_REVIEW.md). This README stays user- and operator-focused.
 
 ## What this PoC demonstrates
 
@@ -18,13 +18,15 @@ Tasklane demonstrates:
 - Drag and drop ordering
 - Light and dark themes
 - `localStorage` persistence
+- **Task archive** — hide tasks from the board while keeping them in storage; restore to the same lane
 - **Drop Zone** — dedicated `/dropzone` flow to paste Copilot JSON, preview and edit tasks, add to backlog, export to **Things 3**, and review **import/export history**
 - **Board import modal** — lightweight paste + preview + create; optional clipboard prefill and a link to the full Drop Zone
 - Optional **Electron** build with a clipboard watcher that nudges you when task-shaped JSON appears on the clipboard
 
 ## Features
 
-- **Task board** — Backlog, In Progress, Blocked, and Done lanes; create, edit, delete, and move tasks.
+- **Task board** — Backlog, In Progress, Blocked, and Done lanes; create, edit, delete, move, and archive tasks.
+- **Task archive** — Archive from the board card toolbar; review and restore on `/archive` (sidebar **Archive**).
 - **Drag and drop task ordering** — Reorder within a column and move between columns (`@dnd-kit/core`).
 - **Epics** — Group work, reorder epics, open epic detail, and link tasks from the board.
 - **Reusable task templates** — Manage patterns on `/templates` and quick-create from the board.
@@ -35,6 +37,14 @@ Tasklane demonstrates:
 - **Browser-local persistence** — Tasks, epics, templates, theme, and sidebar width in `localStorage`.
 - **Inline validation** — Required task, epic, and template titles surface clear errors instead of failing silently.
 - **Copilot JSON import** — Shared parser tolerates BOM, markdown fences, and flexible title fields. Import via **Import tasks** on the board or the full **Drop Zone** experience (`/dropzone`). No Microsoft Graph; JSON only.
+
+## Task Archive
+
+Tasklane keeps one task list in the browser. Each task has an `archived` flag separate from its board lane (`columnId`).
+
+- **Active tasks** appear on the board, in epic counts, epic detail, and Drop Zone duplicate checks.
+- **Archive** — On the board, use **Archive** on a task card. The task leaves the board immediately but stays in `localStorage`. A short status toast confirms the action. There is no confirmation dialog; use **Restore** on the Archive page if you change your mind.
+- **Archive page** — Open **Archive** in the sidebar (`/archive`). Archived tasks are listed with lane and epic context. **Restore** sets the task active again in the same lane and position because `columnId` and `order` are preserved. **Delete** uses the same confirm-and-undo flow as on the board.
 
 ## Setup and run (web)
 
@@ -54,6 +64,10 @@ The repo includes an Electron main process (`electron/main.mjs`) and preload (`e
 | `npm run desktop:dev` | Runs Vite on port 5173 and opens Electron against the dev server (uses `concurrently` + `wait-on`). |
 | `npm run desktop:dist` | Production Vite build, then Electron loads `dist/index.html`. |
 | `npm run desktop` | Electron only; expects a build or dev server per your workflow. |
+| `npm run pack` | Unpacked macOS app in `release/` (run `npm run build` first; `pack` does not rebuild `dist/`) |
+| `npm run dist` | `npm run build` then DMG installer (includes Task Archive via the Vite bundle) |
+
+Electron loads `dist/index.html` in packaged mode (`HashRouter`, so `/archive` works as `#/archive`). See **Task Archive** and [`SOURCE_REVIEW.md`](SOURCE_REVIEW.md) for handoff detail.
 
 **Drop Zone settings** (sidebar, bottom): Things 3 **project / list ID** is stored in `localStorage` (`tasklane-dropzone-things3-listid`). In Electron, **Clipboard watcher** on/off is stored under the app user data folder in `tasklane-settings.json` and applied on launch.
 
@@ -64,7 +78,7 @@ npm run build
 npm run preview
 ```
 
-Use `preview` to verify production output and client-side routing (for example `/epics` or `/dropzone` after refresh).
+Use `preview` to verify production output and client-side routing (for example `/epics`, `/archive`, or `/dropzone` after refresh).
 
 ## Importing tasks from Copilot output
 
@@ -103,13 +117,13 @@ Invalid JSON or rows without a usable **title** are skipped with readable errors
 
 *`source`* is shown in previews where relevant; stored board tasks use the usual fields (title, description, priority, task type, due date, owner, epic unset).
 
-## Data storage
+## Data persistence
 
-All web data is saved in **localStorage** on this machine for the site origin. Keys are fixed; renaming them would orphan existing data.
+All web data is saved in **localStorage** on this machine for the site origin. There is no server-side persistence, sync, or backup unless you export data yourself. Keys are fixed; renaming them would orphan existing data.
 
 | Key | Contents |
 | --- | --- |
-| `kanban-tasks` | Task list (JSON): order, column, task type, priority, due date, owner, epic link, comment notes, timestamps |
+| `kanban-tasks` | Task list (JSON): `archived`, order, column (`columnId`), task type, priority, due date, owner, epic link, comment notes, timestamps |
 | `kanban-epics` | Epics list (JSON) |
 | `kanban-task-templates` | Reusable templates (JSON) |
 | `kanban-theme` | `light` or `dark` |
@@ -121,7 +135,17 @@ All web data is saved in **localStorage** on this machine for the site origin. K
 
 Clear site data for this origin in the browser to reset the app (Electron user data is separate for shell settings).
 
-On load, malformed `localStorage` JSON or unexpected shapes do not crash the app: tasks and epics fall back to empty lists; invalid rows are skipped. Templates default to the built-in seed list when the key is missing or empty; corrupt template JSON yields an empty list until you add templates again. Task types **Migration** and **Day 2** map to **Execution** and **Follow-up** respectively. Other unknown task types are normalised when data is loaded or saved.
+On load, malformed `localStorage` JSON or unexpected shapes do not crash the app: tasks and epics fall back to empty lists; invalid rows are skipped. Tasks without an `archived` field are treated as active. Templates default to the built-in seed list when the key is missing or empty; corrupt template JSON yields an empty list until you add templates again. Task types **Migration** and **Day 2** map to **Execution** and **Follow-up** respectively. Other unknown task types are normalised when data is loaded or saved.
+
+## Validation checklist (Task Archive)
+
+1. Create a task on the board.
+2. Click **Archive** on the card.
+3. Confirm the task disappears from the board and a “Task archived” toast appears.
+4. Open **Archive** in the sidebar and confirm the task is listed.
+5. Click **Restore** and confirm the task reappears in its previous lane.
+6. Refresh the browser and confirm the task is still active on the board.
+7. Archive the task again, open **Archive**, click **Delete**, confirm the undo toast, and use **Undo** if desired.
 
 ## PoC scope and limitations
 
@@ -134,12 +158,13 @@ On load, malformed `localStorage` JSON or unexpected shapes do not crash the app
 - **Not production hardened** — Security, compliance, backups, and operational guarantees are out of scope for this PoC.
 - **Drag/drop and filtering** are intentionally lightweight (for example, active filters affect which cards are visible when choosing drop targets).
 - **No activity feed or sprint model** in this PoC.
+- **Archive** — No bulk archive, archive search, or server-side archive API; archived tasks remain in the same `kanban-tasks` array as active tasks.
 - **No audit trail** for task edits — Drop Zone **history** only logs import/export events from that page, not general board changes.
 - **No single-file backup/export** for all app data yet (imports create tasks; Things export is outbound only).
 
 ## Recommended next steps
 
-Short-term product ideas (see **`HANDOFF.md`** for a longer ordered engineering backlog):
+Short-term product ideas (see **`SOURCE_REVIEW.md`** for implementation notes):
 
 1. Approvals or ownership models beyond a single optional owner field.
 2. Full JSON or CSV backup/export for tasks, epics, and templates.
@@ -165,15 +190,15 @@ Short-term product ideas (see **`HANDOFF.md`** for a longer ordered engineering 
 
 - [React 18](https://react.dev/)
 - [Vite 5](https://vitejs.dev/)
-- [React Router](https://reactrouter.com/) — `/` (board), `/epics`, `/epics/:epicId`, `/templates`, `/dropzone`
+- [React Router](https://reactrouter.com/) — `/` (board), `/epics`, `/epics/:epicId`, `/templates`, `/archive`, `/dropzone`
 - [Electron](https://www.electronjs.org/) — optional desktop shell (dev and packaged workflows in `package.json`)
 - [@dnd-kit](https://dndkit.com/) — drag and drop
 
 ## Project layout (high level)
 
-- `src/App.jsx` — Routes, task/epic/template state, reposition helpers, undo delete, clipboard toast host
+- `src/App.jsx` — Routes, task/epic/template state, active/archived partition, archive/restore handlers, reposition helpers, undo delete, status toasts
 - `src/components/` — Board, columns, cards, layout, forms, **ClipboardToast**, **DropZone**\* pieces
-- `src/pages/` — Epics, epic detail, templates, **DropZone**
+- `src/pages/` — Epics, epic detail, templates, **Archive**, **DropZone**
 - `src/hooks/` — `useLocalStorage`, `useEpicsStorage`, `useTemplatesStorage`, `useTheme`
 - `src/data/taskMetadata.js` — Task types, priorities, built-in template seed definitions
 - `src/utils/parseDropZoneJSON.js` — Shared Copilot / Things JSON parsing for Drop Zone and board import
@@ -222,7 +247,7 @@ npm run build
 npm run preview
 ```
 
-Visit the printed URL and try `/epics`, `/dropzone`, and a direct refresh to confirm routing works.
+Visit the printed URL and try `/epics`, `/archive`, `/dropzone`, and a direct refresh to confirm routing works.
 
 ## License
 

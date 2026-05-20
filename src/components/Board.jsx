@@ -168,6 +168,7 @@ export default function Board({
   onRepositionTask,
   onUpdateTask,
   onDeleteTask,
+  onArchiveTask,
 }) {
   const [showForm, setShowForm] = useState(false)
   const [editingTaskId, setEditingTaskId] = useState(null)
@@ -903,6 +904,7 @@ export default function Board({
                   setEditingTaskId(id)
                 }}
                 onDeleteTask={onDeleteTask}
+                onArchiveTask={onArchiveTask}
               />
             )
           })}

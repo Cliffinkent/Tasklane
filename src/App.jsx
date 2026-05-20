@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect } from 'react'
+import { useRef, useState, useEffect, useMemo } from 'react'
 import { Routes, Route } from 'react-router-dom'
 import { useLocalStorage } from './hooks/useLocalStorage'
 import { useEpicsStorage } from './hooks/useEpicsStorage'
@@ -10,6 +10,7 @@ import EpicsPage from './pages/EpicsPage'
 import EpicDetailPage from './pages/EpicDetailPage'
 import TemplatesPage from './pages/TemplatesPage'
 import DropZone from './pages/DropZone'
+import ArchivePage from './pages/ArchivePage'
 import ClipboardToast from './components/ClipboardToast'
 import { COLUMN_IDS } from './data/columns'
 import {
@@ -20,6 +21,18 @@ import {
 import './App.css'
 
 const UNDO_MS = 5000
+const STATUS_TOAST_MS = 3000
+
+/** Board, Epics, and Drop Zone consume active rows only; archive is a lifecycle flag, not a Kanban lane. */
+function partitionTasksByArchive(tasks) {
+  const activeTasks = []
+  const archivedTasks = []
+  for (const task of tasks) {
+    if (task.archived) archivedTasks.push(task)
+    else activeTasks.push(task)
+  }
+  return { activeTasks, archivedTasks }
+}
 
 function resolveTaskType(incoming, current) {
   const currentNorm = normaliseTaskType(
@@ -108,6 +121,7 @@ function createTaskFromImportInput(input, order, now) {
     dueDate,
     owner,
     comments: [],
+    archived: false,
   }
 }
 
@@ -157,18 +171,18 @@ function repositionTask(tasks, activeTaskId, overId, columnIdSet, now) {
   if (!activeTaskId || activeTaskId === overId) return tasks
 
   const active = tasks.find((t) => t.id === activeTaskId)
-  if (!active) return tasks
+  if (!active || active.archived) return tasks
 
   const isColumn = columnIdSet.has(overId)
   const overTask = !isColumn ? tasks.find((t) => t.id === overId) : null
-  if (!isColumn && !overTask) return tasks
+  if (!isColumn && (!overTask || overTask.archived)) return tasks
 
   const oldCol = active.columnId
   const targetCol = isColumn ? overId : overTask.columnId
 
   const withoutActive = tasks.filter((t) => t.id !== activeTaskId)
   const colTasks = withoutActive
-    .filter((t) => t.columnId === targetCol)
+    .filter((t) => t.columnId === targetCol && !t.archived)
     .sort(
       (a, b) =>
         (Number(a.order) || 0) - (Number(b.order) || 0) ||
@@ -194,7 +208,10 @@ function repositionTask(tasks, activeTaskId, overId, columnIdSet, now) {
   )
 
   const rest = withoutActive.filter((t) => t.columnId !== targetCol)
-  let next = [...rest, ...mergedCol]
+  const archivedInTargetCol = withoutActive.filter(
+    (t) => t.columnId === targetCol && t.archived
+  )
+  let next = [...rest, ...archivedInTargetCol, ...mergedCol]
 
   const cols = new Set([targetCol])
   if (oldCol !== targetCol) cols.add(oldCol)
@@ -208,7 +225,9 @@ function App() {
   const [templates, setTemplates] = useTemplatesStorage()
   const [theme, toggleTheme] = useTheme()
   const [deletedForUndo, setDeletedForUndo] = useState(null)
+  const [statusToast, setStatusToast] = useState(null)
   const undoTimerRef = useRef(null)
+  const statusToastTimerRef = useRef(null)
 
   function handleCreate(data) {
     const trimmed = (data.title || '').trim()
@@ -240,6 +259,7 @@ function App() {
         dueDate,
         owner,
         comments: [],
+        archived: false,
       }
       return [...prev, task]
     })
@@ -268,10 +288,44 @@ function App() {
   }
 
   function handleRepositionTask(activeTaskId, overId) {
+    const task = tasks.find((t) => t.id === activeTaskId)
+    if (!task || task.archived) return
     setTasks((prev) => {
       const now = new Date().toISOString()
       return repositionTask(prev, activeTaskId, overId, COLUMN_IDS, now)
     })
+  }
+
+  function handleArchiveTask(taskId) {
+    const task = tasks.find((t) => t.id === taskId)
+    if (!task || task.archived) return
+    const now = new Date().toISOString()
+    setTasks((prev) => {
+      let changed = false
+      const next = prev.map((t) => {
+        if (t.id !== taskId) return t
+        changed = true
+        return { ...t, archived: true, updatedAt: now }
+      })
+      return changed ? next : prev
+    })
+    showStatusToast('Task archived')
+  }
+
+  function handleRestoreTask(taskId) {
+    const task = tasks.find((t) => t.id === taskId)
+    if (!task || !task.archived) return
+    const now = new Date().toISOString()
+    setTasks((prev) => {
+      let changed = false
+      const next = prev.map((t) => {
+        if (t.id !== taskId) return t
+        changed = true
+        return { ...t, archived: false, updatedAt: now }
+      })
+      return changed ? next : prev
+    })
+    showStatusToast('Task restored')
   }
 
   function handleUpdate(
@@ -443,6 +497,9 @@ function App() {
       if (undoTimerRef.current) {
         clearTimeout(undoTimerRef.current)
       }
+      if (statusToastTimerRef.current) {
+        clearTimeout(statusToastTimerRef.current)
+      }
     }
   }, [])
 
@@ -451,6 +508,22 @@ function App() {
       clearTimeout(undoTimerRef.current)
       undoTimerRef.current = null
     }
+  }
+
+  function clearStatusToastTimer() {
+    if (statusToastTimerRef.current) {
+      clearTimeout(statusToastTimerRef.current)
+      statusToastTimerRef.current = null
+    }
+  }
+
+  function showStatusToast(message) {
+    setStatusToast(message)
+    clearStatusToastTimer()
+    statusToastTimerRef.current = setTimeout(() => {
+      setStatusToast(null)
+      statusToastTimerRef.current = null
+    }, STATUS_TOAST_MS)
   }
 
   function handleDeleteTask(taskId) {
@@ -480,6 +553,11 @@ function App() {
     clearUndoTimer()
   }
 
+  const { activeTasks, archivedTasks } = useMemo(
+    () => partitionTasksByArchive(tasks),
+    [tasks]
+  )
+
   return (
     <>
       <Routes>
@@ -490,7 +568,7 @@ function App() {
             index
             element={
               <Board
-                tasks={tasks}
+                tasks={activeTasks}
                 epics={epics}
                 templates={templates}
                 onCreateTask={handleCreate}
@@ -498,6 +576,7 @@ function App() {
                 onRepositionTask={handleRepositionTask}
                 onUpdateTask={handleUpdate}
                 onDeleteTask={handleDeleteTask}
+                onArchiveTask={handleArchiveTask}
               />
             }
           />
@@ -506,7 +585,7 @@ function App() {
             element={
               <EpicsPage
                 epics={epics}
-                tasks={tasks}
+                tasks={activeTasks}
                 onCreateEpic={handleCreateEpic}
                 onDeleteEpic={handleDeleteEpic}
                 onReorderEpics={handleReorderEpics}
@@ -518,7 +597,7 @@ function App() {
             element={
               <EpicDetailPage
                 epics={epics}
-                tasks={tasks}
+                tasks={activeTasks}
                 onUpdateEpic={handleUpdateEpic}
                 onRepositionTask={handleRepositionTask}
               />
@@ -536,12 +615,34 @@ function App() {
             }
           />
           <Route
+            path="archive"
+            element={
+              <ArchivePage
+                tasks={archivedTasks}
+                epics={epics}
+                onRestoreTask={handleRestoreTask}
+                onDeleteTask={handleDeleteTask}
+              />
+            }
+          />
+          <Route
             path="dropzone"
-            element={<DropZone tasks={tasks} addBoardTasks={handleCreateTasks} />}
+            element={
+              <DropZone tasks={activeTasks} addBoardTasks={handleCreateTasks} />
+            }
           />
         </Route>
       </Routes>
       <ClipboardToast />
+      {statusToast ? (
+        <div
+          className={`undo-toast status-toast${deletedForUndo ? ' status-toast--stacked' : ''}`}
+          role="status"
+          aria-live="polite"
+        >
+          <span className="undo-toast-message">{statusToast}</span>
+        </div>
+      ) : null}
       {deletedForUndo && (
         <div className="undo-toast" role="status">
           <span className="undo-toast-message">Task deleted</span>

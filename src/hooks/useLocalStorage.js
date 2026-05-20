@@ -95,6 +95,7 @@ function normalizeStoredTask(t) {
     dueDate,
     owner,
     comments,
+    archived: Boolean(t.archived),
   }
   if (Number.isFinite(rawOrder) && rawOrder >= 0) row.order = rawOrder
   return row

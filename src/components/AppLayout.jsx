@@ -37,6 +37,13 @@ function getPageHeaderMeta(pathname) {
       subtitle: 'Create reusable task patterns for recurring work.',
     }
   }
+  if (matchPath({ path: '/archive', end: true }, pathname)) {
+    return {
+      title: 'Archive',
+      subtitle:
+        'Tasks removed from the board. Restore them to make them active again.',
+    }
+  }
   if (matchPath({ path: '/dropzone', end: true }, pathname)) {
     return {
       title: 'Drop Zone',
@@ -116,6 +123,9 @@ export default function AppLayout({ theme, onToggleTheme }) {
           </NavLink>
           <NavLink to="/templates" className="sidebar-link">
             Templates
+          </NavLink>
+          <NavLink to="/archive" className="sidebar-link">
+            Archive
           </NavLink>
           <div className="sidebar-nav-divider" aria-hidden="true" />
           <NavLink to="/dropzone" className="sidebar-link">

@@ -2268,3 +2268,82 @@ Visit the printed URL and try `/epics` and a direct refresh to confirm routing w
 Private project; add a license if you plan to publish.
 ```
 
+---
+
+## Task Archive — handoff summary
+
+**Feature:** Task Archive
+
+**User behaviour**
+
+- Archive from a board card toolbar (**Archive**).
+- Archived tasks disappear from the board, epic counts, epic detail, and Drop Zone duplicate checks.
+- **Archive** in the sidebar (`/archive`, HashRouter `#/archive`) lists archived tasks.
+- **Restore** returns the task to its previous lane (`columnId` and `order` preserved).
+- **Delete** on the Archive page uses the existing confirm-and-undo flow.
+- Short status toasts: “Task archived” / “Task restored” (reuses `.undo-toast` styling).
+
+**Data model**
+
+- `archived: boolean` on each task — lifecycle state (active vs archived).
+- `columnId` remains the Kanban lane (Backlog, In Progress, Blocked, Done); not used for archive.
+
+**Persistence**
+
+- Unchanged `localStorage` key: `kanban-tasks`.
+- Legacy tasks without `archived` load as active (`Boolean(t.archived)` in normalisation).
+- No server-side persistence.
+
+**Electron**
+
+- The desktop shell loads the Vite renderer from `dist/index.html` (not duplicated `src/` under `electron/`).
+- Run `npm run build` before `npm run pack` (`pack` does not build the renderer).
+- Use `npm run dist` for a fresh DMG; `npm run desktop:dist` to run Electron against a local production build.
+
+**Known non-goals**
+
+- No bulk archive, archive search, server persistence, or archive confirmation dialog.
+
+---
+
+## Task Archive implementation notes
+
+*Added for handoff. The embedded file snapshots above are historical; the live app includes archive support.*
+
+### Files touched
+
+| Area | Files |
+| --- | --- |
+| Model and persistence | `src/hooks/useLocalStorage.js` (`archived` on normalise and save) |
+| State and routes | `src/App.jsx` (`partitionTasksByArchive`, handlers, `/archive` route, `activeTasks` props) |
+| Board UI | `src/components/Board.jsx`, `src/components/Column.jsx`, `src/components/Card.jsx` (Archive button) |
+| Archive UI | `src/pages/ArchivePage.jsx` |
+| Navigation | `src/components/AppLayout.jsx` |
+| Styles | `src/App.css` |
+
+### Model choice
+
+- **`archived: boolean`** — lifecycle flag (active vs archived).
+- **`columnId`** — Kanban lane only (Backlog, In Progress, Blocked, Done). Not overloaded for archive.
+- On archive/restore, only `archived` and `updatedAt` change; **`columnId` and `order` are preserved** so restore returns the card to the same lane position.
+
+### Why filter in `App.jsx`
+
+`App.jsx` holds the full `tasks` array (source of truth for `localStorage`). It derives `activeTasks` and `archivedTasks` once and passes **active tasks only** to the board, Epics, epic detail, and Drop Zone. That avoids archived tasks leaking into board counts, epic counts, duplicate import checks, or drag-and-drop. The Archive page receives `archivedTasks` only.
+
+### Known limitations
+
+- No bulk archive or multi-select archive.
+- No search or filter on the Archive page.
+- No server persistence; archive state lives in the same `kanban-tasks` `localStorage` key as active tasks.
+- No archive confirmation dialog (restore is the undo path).
+- Reposition logic ignores archived rows when computing column order on the board.
+
+### Handoff recommendation (backend)
+
+If Tasklane gains an API and database:
+
+- Treat **`archived` as a first-class task field** in the schema and API (not as a pseudo-column).
+- Keep the semantic split: **archive = lifecycle**, **`columnId` = board lane**.
+- Filter active vs archived at the service or query layer the same way `App.jsx` does today, so list endpoints for the board and epics never return archived rows unless explicitly requested.
+

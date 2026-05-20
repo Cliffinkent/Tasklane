@@ -25,6 +25,7 @@ export default function Column({
   onRepositionTask,
   onEditTask,
   onDeleteTask,
+  onArchiveTask,
 }) {
   const { setNodeRef, isOver } = useDroppable({
     id: columnId,
@@ -82,6 +83,9 @@ export default function Column({
             onMove={onRepositionTask}
             onEdit={onEditTask}
             onDelete={onDeleteTask}
+            onArchive={
+              onArchiveTask ? () => onArchiveTask(task.id) : undefined
+            }
           />
         ))}
       </div>
