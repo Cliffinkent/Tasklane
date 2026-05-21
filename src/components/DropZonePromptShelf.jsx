@@ -8,6 +8,10 @@ import {
   DEFAULT_DROPZONE_PROMPT_THINGS3,
   DROPZONE_PROMPT_STORAGE_TASKLANE,
   DROPZONE_PROMPT_STORAGE_THINGS3,
+  DROPZONE_PROMPT_VERSION_KEY_TASKLANE,
+  DROPZONE_PROMPT_VERSION_TASKLANE,
+  loadDropZonePrompt,
+  saveDropZonePrompt,
 } from '../data/dropzonePromptDefaults'
 
 const COPY_DISMISS_MS = 3000
@@ -24,8 +28,10 @@ function readStoredPrompt(key, fallback) {
 export default function DropZonePromptShelf({ destination, onDestinationChange }) {
   const [shelfOpen, setShelfOpen] = useState(false)
   const [promptTasklane, setPromptTasklane] = useState(() =>
-    readStoredPrompt(
+    loadDropZonePrompt(
       DROPZONE_PROMPT_STORAGE_TASKLANE,
+      DROPZONE_PROMPT_VERSION_KEY_TASKLANE,
+      DROPZONE_PROMPT_VERSION_TASKLANE,
       DEFAULT_DROPZONE_PROMPT_TASKLANE
     )
   )
@@ -43,9 +49,12 @@ export default function DropZonePromptShelf({ destination, onDestinationChange }
 
   const persistTasklane = useCallback((next) => {
     setPromptTasklane(next)
-    try {
-      window.localStorage.setItem(DROPZONE_PROMPT_STORAGE_TASKLANE, next)
-    } catch (_) {}
+    saveDropZonePrompt(
+      DROPZONE_PROMPT_STORAGE_TASKLANE,
+      DROPZONE_PROMPT_VERSION_KEY_TASKLANE,
+      DROPZONE_PROMPT_VERSION_TASKLANE,
+      next
+    )
   }, [])
 
   const persistThings3 = useCallback((next) => {

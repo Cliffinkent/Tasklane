@@ -2,6 +2,33 @@
 
 export const DROPZONE_PROMPT_STORAGE_TASKLANE = 'tasklane-dropzone-prompt-tasklane'
 export const DROPZONE_PROMPT_STORAGE_THINGS3 = 'tasklane-dropzone-prompt-things3'
+export const DROPZONE_PROMPT_VERSION_KEY_TASKLANE =
+  'tasklane-dropzone-prompt-tasklane-version'
+/** Bump when DEFAULT_DROPZONE_PROMPT_TASKLANE changes so stored copies refresh. */
+export const DROPZONE_PROMPT_VERSION_TASKLANE = 2
+
+export function loadDropZonePrompt(storageKey, versionKey, expectedVersion, fallback) {
+  if (typeof window === 'undefined') return fallback
+  try {
+    const storedVersion = window.localStorage.getItem(versionKey)
+    if (storedVersion !== String(expectedVersion)) {
+      window.localStorage.setItem(versionKey, String(expectedVersion))
+      window.localStorage.setItem(storageKey, fallback)
+      return fallback
+    }
+    const raw = window.localStorage.getItem(storageKey)
+    if (raw != null && raw !== '') return raw
+  } catch (_) {}
+  return fallback
+}
+
+export function saveDropZonePrompt(storageKey, versionKey, expectedVersion, text) {
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.setItem(storageKey, text)
+    window.localStorage.setItem(versionKey, String(expectedVersion))
+  } catch (_) {}
+}
 
 export const DEFAULT_DROPZONE_PROMPT_TASKLANE = `You are helping me maintain my Tasklane agile task board.
 
