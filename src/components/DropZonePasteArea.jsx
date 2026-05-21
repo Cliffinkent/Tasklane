@@ -21,7 +21,7 @@ export default function DropZonePasteArea({
           className={`task-form-textarea dropzone-paste-textarea${
             parsedLocked ? ' dropzone-paste-textarea--parsed' : ''
           }`}
-          placeholder="Paste Copilot JSON here…"
+          placeholder="Paste Copilot response or JSON here…"
           value={pasteText}
           onChange={(e) => onPasteTextChange(e.target.value)}
           onPaste={handlePaste}
@@ -42,8 +42,9 @@ export default function DropZonePasteArea({
         </button>
       </div>
       <p id="dropzone-json-paste-hint" className="dropzone-paste-hint">
-        Paste the JSON output from Copilot, then click Parse — or it will
-        auto-detect from your clipboard.
+        Paste Copilot&apos;s full reply (briefing plus a <code>json</code> code
+        block at the bottom) or raw JSON, then click Parse. Tasklane imports the
+        JSON block only.
       </p>
       {parseError ? (
         <p id="dropzone-json-parse-error" className="form-error" role="alert">

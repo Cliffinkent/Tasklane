@@ -6,7 +6,7 @@ import {
 
 const TASKLANE_PRIORITIES = new Set(['Low', 'Medium', 'High', 'Critical'])
 const THINGS_PRIORITIES = new Set(['high', 'medium', 'low'])
-const SOURCE_SET = new Set(['Email', 'Teams', 'Meeting', 'Other'])
+const SOURCE_SET = new Set(['Email', 'Teams', 'Meeting', 'Other', 'Proactive'])
 
 const TITLE_KEYS = [
   'title',
@@ -43,6 +43,17 @@ function normaliseCommonJsonEscapes(input) {
     .trim()
 }
 
+/** Prefer the last ```json fenced block (Copilot briefing + trailing JSON). */
+function extractFinalJsonCodeBlock(text) {
+  const re = /```\s*json\s*\n?([\s\S]*?)```/gi
+  let last = null
+  let match
+  while ((match = re.exec(text)) !== null) {
+    last = match[1].trim()
+  }
+  return last
+}
+
 function stripMarkdownFences(text) {
   let t = String(text ?? '').trim()
   const full = t.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?```$/im)
@@ -72,11 +83,15 @@ function extractLikelyJson(text) {
 }
 
 function tryJsonParseCandidates(rawInput) {
+  const finalJsonBlock = extractFinalJsonCodeBlock(rawInput)
   const chain = [
+    finalJsonBlock,
     rawInput,
     stripMarkdownFences(rawInput),
-    extractLikelyJson(stripMarkdownFences(rawInput)),
-    normaliseCommonJsonEscapes(extractLikelyJson(stripMarkdownFences(rawInput))),
+    extractLikelyJson(finalJsonBlock || stripMarkdownFences(rawInput)),
+    normaliseCommonJsonEscapes(
+      extractLikelyJson(finalJsonBlock || stripMarkdownFences(rawInput))
+    ),
     extractLikelyJson(rawInput),
     normaliseCommonJsonEscapes(extractLikelyJson(rawInput)),
   ]

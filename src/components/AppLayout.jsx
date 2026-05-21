@@ -48,7 +48,7 @@ function getPageHeaderMeta(pathname) {
     return {
       title: 'Drop Zone',
       subtitle:
-        'Paste JSON from Copilot to preview, edit, and import tasks to your board or export to Things 3.',
+        'Paste Copilot output (briefing plus JSON) or raw JSON to preview, edit, and import tasks.',
     }
   }
   return { title: 'Tasklane', subtitle: null }

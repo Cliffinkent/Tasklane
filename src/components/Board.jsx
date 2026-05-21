@@ -25,41 +25,7 @@ import Card, { CardContent } from './Card'
 import { parseDropZoneJSON } from '../utils/parseDropZoneJSON'
 import { normaliseImportTitle } from '../utils/normaliseImportTitle'
 import { formatDateLabel } from '../utils/formatDateLabel'
-
-const TASKLANE_COPILOT_IMPORT_PROMPT = `You are helping me maintain my Tasklane agile task board.
-
-Review my recent emails and Teams messages and identify concrete actions I need to track.
-
-Return JSON only. Do not include markdown, commentary, headings, or explanations.
-
-Use this exact schema:
-
-{
-  "tasks": [
-    {
-      "title": "Short action title",
-      "description": "Useful context from the email or Teams message",
-      "priority": "Low | Medium | High | Critical",
-      "taskType": "Discovery | Assessment | Planning | Execution | Validation | Follow-up",
-      "owner": "Person or team if explicitly known, otherwise empty string",
-      "dueDate": "YYYY-MM-DD if explicitly stated, otherwise empty string",
-      "source": "Email | Teams | Meeting | Other"
-    }
-  ]
-}
-
-Rules:
-- Only include concrete actions, commitments, follow-ups, blockers, or decisions that need tracking.
-- Do not include general updates unless they require action.
-- Do not invent due dates.
-- Do not invent owners.
-- Keep titles concise and action-oriented.
-- Put useful context in the description.
-- Use priority Medium unless the message clearly indicates urgency or impact.
-- Use source Email for email-derived actions.
-- Use source Teams for Teams-derived actions.
-- Use source Meeting for meeting-derived actions.
-- Return valid JSON only.`
+import { DEFAULT_DROPZONE_PROMPT_TASKLANE } from '../data/dropzonePromptDefaults'
 
 function previewPriorityVariant(p) {
   switch (p) {
@@ -221,7 +187,7 @@ export default function Board({
       return
     }
     navigator.clipboard
-      .writeText(TASKLANE_COPILOT_IMPORT_PROMPT)
+      .writeText(DEFAULT_DROPZONE_PROMPT_TASKLANE)
       .then(() => {
         setCopyPromptStatus('Copied')
       })
@@ -637,8 +603,9 @@ export default function Board({
             {importStep === 'paste' ? (
               <>
                 <p className="import-modal-help">
-                  Paste Copilot JSON with a top-level <code>tasks</code> array.
-                  Markdown code fences and surrounding text are OK. Each task
+                  Paste Copilot&apos;s full reply or JSON with a top-level{' '}
+                  <code>tasks</code> array. A <code>json</code> code block at the
+                  end of a briefing is OK. Each task
                   should include <code>title</code>, and can optionally include{' '}
                   <code>description</code>, <code>priority</code>,{' '}
                   <code>taskType</code>, <code>owner</code>,{' '}
@@ -659,8 +626,8 @@ export default function Board({
                   {showCopilotPrompt ? (
                     <div className="import-prompt-panel">
                       <p className="import-prompt-help">
-                        Copy this prompt into Copilot, then paste the JSON
-                        output below.
+                        Copy this prompt into Copilot, then paste the full reply
+                        or the <code>json</code> block below.
                       </p>
                       <div className="import-prompt-actions">
                         <button
@@ -681,7 +648,7 @@ export default function Board({
                         id="import-copilot-prompt-textarea"
                         className="import-prompt-textarea task-form-textarea"
                         readOnly
-                        value={TASKLANE_COPILOT_IMPORT_PROMPT}
+                        value={DEFAULT_DROPZONE_PROMPT_TASKLANE}
                         spellCheck={false}
                         rows={8}
                       />
@@ -701,7 +668,7 @@ export default function Board({
                   ) : null}
                 </div>
                 <label className="import-modal-label" htmlFor="import-json-textarea">
-                  Paste Copilot JSON
+                  Paste Copilot output
                 </label>
                 {importClipboardDetected ? (
                   <div

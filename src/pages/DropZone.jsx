@@ -101,7 +101,7 @@ export default function DropZone({ tasks: boardTasks = [], addBoardTasks }) {
     }
     if (!text) {
       setParseError(
-        'Nothing to parse yet. Paste Copilot JSON or copy it to the clipboard.'
+        'Nothing to parse yet. Paste a Copilot reply or JSON, or copy it to the clipboard.'
       )
       return
     }
@@ -304,7 +304,7 @@ export default function DropZone({ tasks: boardTasks = [], addBoardTasks }) {
                   <div className="empty-state-inner">
                     <div className="empty-state-panel">
                       <p className="empty-state-message">
-                        Copy JSON from Copilot to get started.
+                        Paste a Copilot reply or JSON, then click Parse.
                       </p>
                     </div>
                   </div>

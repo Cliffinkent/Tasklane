@@ -7,7 +7,7 @@ import DestinationToggle, {
   DESTINATION_THINGS3,
 } from './DestinationToggle'
 
-const SOURCE_OPTIONS = ['Email', 'Teams', 'Meeting', 'Other']
+const SOURCE_OPTIONS = ['Email', 'Teams', 'Meeting', 'Other', 'Proactive']
 
 const TASKLANE_PRIORITY_CYCLE = ['Critical', 'High', 'Medium', 'Low']
 const THINGS_PRIORITY_CYCLE = ['High', 'Medium', 'Low']
