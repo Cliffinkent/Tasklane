@@ -51,6 +51,9 @@ try {
       ipcRenderer.send('clipboard:set-watcher-enabled', Boolean(enabled))
     },
     openExternalURL: (url) => ipcRenderer.invoke('shell:open-external', url),
+    loadKanbanStore: () => ipcRenderer.invoke('kanban:load-store'),
+    saveKanbanTasks: (tasks) => ipcRenderer.invoke('kanban:save-tasks', tasks),
+    saveKanbanEpics: (epics) => ipcRenderer.invoke('kanban:save-epics', epics),
   })
 } catch (e) {
   console.error('[Tasklane preload] contextBridge electronAPI failed', e)

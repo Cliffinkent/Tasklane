@@ -17,8 +17,3 @@ if (fs.existsSync(canonical)) {
   }
   fs.renameSync(canonical, vendor)
 }
-
-// electron-builder expects node_modules/electron; symlink avoids shadowing at runtime.
-if (fs.existsSync(vendor) && !fs.existsSync(canonical)) {
-  fs.symlinkSync('.electron-vendor', canonical, 'dir')
-}

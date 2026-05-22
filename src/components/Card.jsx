@@ -34,7 +34,7 @@ function dueDisplay(isoDate) {
 
 function isInteractiveElement(target, cardRoot) {
   const interactive = target?.closest?.(
-    'button, a, input, select, textarea, label, .card-move-backdrop, .card-move-menu'
+    'button, a, input, select, textarea, label, .card-move-backdrop, .card-move-menu, .card-description-toggle'
   )
 
   if (interactive) return true
@@ -58,6 +58,7 @@ function CardContent({
   isOverlay = false,
 }) {
   const [showMoveMenu, setShowMoveMenu] = useState(false)
+  const [descriptionExpanded, setDescriptionExpanded] = useState(false)
   const otherColumns = COLUMNS.filter((c) => c.id !== task.columnId)
   const epic = task.epicId ? epics.find((e) => e.id === task.epicId) : null
 
@@ -65,11 +66,15 @@ function CardContent({
     task.taskType ?? '',
     DEFAULT_TASK_TYPE
   )
-  const priorityLabel = task.priority || 'Medium'
+  const priorityLabel = String(task.priority ?? '').trim()
+  const descriptionText = String(task.description ?? '').trim()
+  const showDescriptionToggle = !isOverlay && descriptionText.length > 0
+  const showDescriptionBody = descriptionText.length > 0 && descriptionExpanded && !isOverlay
   const dueStr = dueDisplay(task.dueDate)
   const ownerStr = typeof task.owner === 'string' && task.owner.trim() ? task.owner.trim() : null
   const commentCount = Array.isArray(task.comments) ? task.comments.length : 0
   const priorityClass = priorityCardClass(task.priority)
+  const taskTitleForLabel = (task.title || '').trim() || 'task'
 
   return (
     <div
@@ -78,16 +83,6 @@ function CardContent({
       <div className="card-toolbar">
         <div className="card-badges">
           <span className="task-type-badge">{taskTypeLabel}</span>
-          <span
-            className={`priority-badge priority-badge--${priorityVariant(priorityLabel)}`}
-          >
-            {priorityLabel}
-          </span>
-          {epic ? (
-            <span className="epic-badge">{epic.name}</span>
-          ) : task.epicId ? (
-            <span className="epic-badge epic-badge--unknown">Unknown epic</span>
-          ) : null}
         </div>
         {!isOverlay && (
           <div className="card-actions">
@@ -175,8 +170,28 @@ function CardContent({
 
       <h3 className="card-title">{task.title}</h3>
 
-      {task.description ? (
-        <p className="card-description">{task.description}</p>
+      {showDescriptionBody ? (
+        <p className="card-description card-description--expanded">{descriptionText}</p>
+      ) : null}
+
+      {showDescriptionToggle ? (
+        <button
+          type="button"
+          className="card-description-toggle"
+          onClick={(e) => {
+            e.stopPropagation()
+            setDescriptionExpanded((v) => !v)
+          }}
+          onPointerDown={(e) => e.stopPropagation()}
+          aria-expanded={descriptionExpanded}
+          aria-label={
+            descriptionExpanded
+              ? `Show less description for ${taskTitleForLabel}`
+              : `Show more description for ${taskTitleForLabel}`
+          }
+        >
+          {descriptionExpanded ? 'Show less' : 'Show more'}
+        </button>
       ) : null}
 
       {dueStr || ownerStr || commentCount > 0 ? (
@@ -208,6 +223,25 @@ function CardContent({
             </button>
           ) : null}
         </footer>
+      ) : null}
+
+      {priorityLabel || epic || task.epicId ? (
+        <div className="card-footer-meta">
+          {priorityLabel ? (
+            <span
+              className={`card-footer-badge priority-badge priority-badge--${priorityVariant(priorityLabel)}`}
+            >
+              {priorityLabel}
+            </span>
+          ) : null}
+          {epic ? (
+            <span className="card-footer-badge epic-badge">{epic.name}</span>
+          ) : task.epicId ? (
+            <span className="card-footer-badge epic-badge epic-badge--unknown">
+              Unknown epic
+            </span>
+          ) : null}
+        </div>
       ) : null}
     </div>
   )

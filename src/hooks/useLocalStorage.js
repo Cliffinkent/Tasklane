@@ -5,6 +5,11 @@ import {
   PRIORITY_SET,
   DEFAULT_PRIORITY,
 } from '../data/taskMetadata'
+import {
+  isElectronKanbanStore,
+  loadElectronKanbanOnce,
+  saveElectronKanbanTasks,
+} from '../storage/electronKanbanHydration'
 
 const STORAGE_KEY = 'kanban-tasks'
 
@@ -145,16 +150,62 @@ function getStored() {
   }
 }
 
+function normalizeStoredTasks(rows) {
+  if (!Array.isArray(rows)) return []
+  const parsed = rows
+    .filter((item) => item && typeof item === 'object')
+    .map(normalizeStoredTask)
+    .filter(Boolean)
+  return normalizeOrdersInPayload(parsed)
+}
+
 export function useLocalStorage() {
-  const [tasks, setTasksState] = useState(getStored)
+  const [tasks, setTasksState] = useState(() =>
+    isElectronKanbanStore() ? [] : getStored()
+  )
+  const [hydrated, setHydrated] = useState(() => !isElectronKanbanStore())
 
   useEffect(() => {
+    if (!isElectronKanbanStore()) {
+      setTasksState(getStored())
+      setHydrated(true)
+      return undefined
+    }
+
+    let cancelled = false
+    loadElectronKanbanOnce().then((payload) => {
+      if (cancelled) return
+      const fromFile = normalizeStoredTasks(payload?.tasks)
+      const fromLocal = getStored()
+      if (fromFile.length) {
+        setTasksState(fromFile)
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(fromFile))
+        } catch (_) {}
+      } else if (fromLocal.length) {
+        setTasksState(fromLocal)
+        saveElectronKanbanTasks(fromLocal)
+      } else {
+        setTasksState([])
+      }
+      setHydrated(true)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!hydrated) return
     try {
       if (typeof localStorage !== 'undefined') {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks))
       }
     } catch (_) {}
-  }, [tasks])
+    if (isElectronKanbanStore()) {
+      saveElectronKanbanTasks(tasks)
+    }
+  }, [tasks, hydrated])
 
   return [tasks, setTasksState]
 }

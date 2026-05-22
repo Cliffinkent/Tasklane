@@ -3,9 +3,17 @@ import { execFileSync } from 'node:child_process'
 import path from 'node:path'
 import fs from 'node:fs'
 import { fileURLToPath } from 'node:url'
+import {
+  ensureStableUserData,
+  loadKanbanStore,
+  saveKanbanTasks,
+  saveKanbanEpics,
+} from './kanbanStorage.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const isDev = !app.isPackaged
+
+ensureStableUserData(app)
 
 const SETTINGS_PATH = () =>
   path.join(app.getPath('userData'), 'tasklane-settings.json')
@@ -168,6 +176,21 @@ function createWindow() {
 
 app.whenReady().then(() => {
   loadAppSettings()
+
+  ipcMain.handle('kanban:load-store', () => {
+    const appData = app.getPath('appData')
+    return loadKanbanStore(app.getPath('userData'), appData)
+  })
+
+  ipcMain.handle('kanban:save-tasks', (_event, tasks) => {
+    saveKanbanTasks(app.getPath('userData'), tasks)
+    return { ok: true }
+  })
+
+  ipcMain.handle('kanban:save-epics', (_event, epics) => {
+    saveKanbanEpics(app.getPath('userData'), epics)
+    return { ok: true }
+  })
 
   ipcMain.handle('shell:open-external', async (_event, url) => {
     if (typeof url !== 'string' || !url.trim()) {

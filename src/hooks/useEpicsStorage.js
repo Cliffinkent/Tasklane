@@ -1,4 +1,9 @@
 import { useState, useEffect } from 'react'
+import {
+  isElectronKanbanStore,
+  loadElectronKanbanOnce,
+  saveElectronKanbanEpics,
+} from '../storage/electronKanbanHydration'
 
 const STORAGE_KEY = 'kanban-epics'
 
@@ -51,16 +56,61 @@ function getStored() {
   }
 }
 
+function normalizeStoredEpics(rows) {
+  if (!Array.isArray(rows)) return []
+  return rows
+    .filter((item) => item && typeof item === 'object')
+    .map(normalizeStoredEpic)
+    .filter(Boolean)
+}
+
 export function useEpicsStorage() {
-  const [epics, setEpicsState] = useState(getStored)
+  const [epics, setEpicsState] = useState(() =>
+    isElectronKanbanStore() ? [] : getStored()
+  )
+  const [hydrated, setHydrated] = useState(() => !isElectronKanbanStore())
 
   useEffect(() => {
+    if (!isElectronKanbanStore()) {
+      setEpicsState(getStored())
+      setHydrated(true)
+      return undefined
+    }
+
+    let cancelled = false
+    loadElectronKanbanOnce().then((payload) => {
+      if (cancelled) return
+      const fromFile = normalizeStoredEpics(payload?.epics)
+      const fromLocal = getStored()
+      if (fromFile.length) {
+        setEpicsState(fromFile)
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(fromFile))
+        } catch (_) {}
+      } else if (fromLocal.length) {
+        setEpicsState(fromLocal)
+        saveElectronKanbanEpics(fromLocal)
+      } else {
+        setEpicsState([])
+      }
+      setHydrated(true)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!hydrated) return
     try {
       if (typeof localStorage !== 'undefined') {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(epics))
       }
     } catch (_) {}
-  }, [epics])
+    if (isElectronKanbanStore()) {
+      saveElectronKanbanEpics(epics)
+    }
+  }, [epics, hydrated])
 
   return [epics, setEpicsState]
 }

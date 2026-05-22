@@ -31,12 +31,13 @@ Tasklane demonstrates:
 - **Epics** — Group work, reorder epics, open epic detail, and link tasks from the board.
 - **Reusable task templates** — Manage patterns on `/templates` and quick-create from the board.
 - **Task metadata** — Type, priority, due date, owner, and optional epic link on each task.
+- **Compact board cards** — Long descriptions are hidden by default; use **Show more** / **Show less** per card. Priority and epic badges sit at the bottom of the card; task type stays in the top toolbar.
 - **Task comments/notes** — Add and remove comments in the task edit form; board cards show comment count only.
 - **Search and filters** — Search title, description, and owner; filter by status, epic, type, and priority with clear filters.
 - **Light and dark theme** — Toggle in the sidebar; choice is persisted in the browser.
 - **Browser-local persistence** — Tasks, epics, templates, theme, and sidebar width in `localStorage`.
 - **Inline validation** — Required task, epic, and template titles surface clear errors instead of failing silently.
-- **Copilot JSON import** — Shared parser tolerates BOM, markdown fences, and flexible title fields. Import via **Import tasks** on the board or the full **Drop Zone** experience (`/dropzone`). No Microsoft Graph; JSON only.
+- **Copilot import** — Drop Zone and the board import modal share a Copilot prompt that returns a daily briefing plus a trailing `json` code block. The parser accepts raw JSON or markdown with a final fenced `json` block. No Microsoft Graph; JSON only.
 
 ## Task Archive
 
@@ -65,9 +66,24 @@ The repo includes an Electron main process (`electron/main.mjs`) and preload (`e
 | `npm run desktop:dist` | Production Vite build, then Electron loads `dist/index.html`. |
 | `npm run desktop` | Electron only; expects a build or dev server per your workflow. |
 | `npm run pack` | Unpacked macOS app in `release/` (run `npm run build` first; `pack` does not rebuild `dist/`) |
-| `npm run dist` | `npm run build` then DMG installer (includes Task Archive via the Vite bundle) |
+| `npm run dist` | Production build, repair Electron vendor symlinks, then DMG installer in `release/` |
+| `npm run release:patch` | Bump patch version in `package.json`, then run `dist` |
 
 Electron loads `dist/index.html` in packaged mode (`HashRouter`, so `/archive` works as `#/archive`). See **Task Archive** and [`SOURCE_REVIEW.md`](SOURCE_REVIEW.md) for handoff detail.
+
+**Desktop profile (tasks and epics)** — The packaged app stores board data under a stable folder so reinstalling the DMG does not start from scratch:
+
+- Profile root: `~/Library/Application Support/com.tasklane.app` (macOS)
+- Task and epic snapshots: `data/kanban-tasks.json`, `data/kanban-epics.json`
+- On first launch, Tasklane copies legacy profiles (`task-manager`, `Taskdrop`, `Tasklane`) and attempts to import from older browser storage if needed.
+
+To restore manually after a bad install:
+
+```bash
+bash scripts/restore-tasklane-profile.sh
+```
+
+If `npm run dist` fails with `ELOOP` on `.electron-vendor`, run `node scripts/repair-electron-vendor.mjs` and try again.
 
 **Drop Zone settings** (sidebar, bottom): Things 3 **project / list ID** is stored in `localStorage` (`tasklane-dropzone-things3-listid`). In Electron, **Clipboard watcher** on/off is stored under the app user data folder in `tasklane-settings.json` and applied on launch.
 
@@ -84,7 +100,7 @@ Use `preview` to verify production output and client-side routing (for example `
 
 ### Board (quick path)
 
-1. On the **Task Board**, choose **Import tasks** (next to **Add task** and **Use template**). In the modal, expand **Need the Copilot prompt?** to copy a Microsoft 365 Copilot prompt that asks for Tasklane-compatible JSON, or draft JSON yourself with a **`tasks`** array (or a top-level JSON array of task objects — see Drop Zone below).
+1. On the **Task Board**, choose **Import tasks** (next to **Add task** and **Use template**). In the modal, expand **Need the Copilot prompt?** to copy the Tasklane Copilot prompt (briefing plus trailing JSON), or paste JSON yourself with a **`tasks`** array (or a top-level JSON array of task objects — see Drop Zone below). Paste the full Copilot reply or just the final `json` block.
 2. If the clipboard already contains valid task JSON when the modal opens, the textarea may prefill and a short notice appears.
 3. Paste or adjust the JSON, then **Preview tasks**. Untick rows you do not want, then **Create selected tasks**. They appear in **Backlog** at the end of the column.
 4. **Need more options?** → **Open Drop Zone** closes the modal and navigates to `/dropzone` (clipboard JSON can be passed through so Drop Zone opens with the same text).
@@ -92,7 +108,7 @@ Use `preview` to verify production output and client-side routing (for example `
 ### Drop Zone (full path)
 
 1. Open **Drop Zone** from the sidebar (`/dropzone`).
-2. Use the **Import** tab: prompt shelf (editable per destination), paste area, **Parse** / auto-parse, then an editable preview. Send checked tasks to the board (**Add to Board**) or **Export to Things 3** (builds a `things:///json?...` URL; Electron opens it via the shell helper).
+2. Use the **Import** tab: prompt shelf (editable per destination; **Reset to Default** picks up prompt updates), paste area, **Parse** / auto-parse, then an editable preview. Paste a full Copilot reply or raw JSON — Tasklane imports the `json` block at the bottom. Send checked tasks to the board (**Add to Board**) or **Export to Things 3** (builds a `things:///json?...` URL; Electron opens it via the shell helper).
 3. Use the **History** tab to see recent board imports and Things exports stored in `localStorage`, with optional **Clear history**.
 
 Invalid JSON or rows without a usable **title** are skipped with readable errors or warnings.
@@ -109,7 +125,7 @@ Invalid JSON or rows without a usable **title** are skipped with readable errors
       "taskType": "Discovery | Assessment | Planning | Execution | Validation | Follow-up",
       "owner": "Person or team if known, otherwise \"\"",
       "dueDate": "YYYY-MM-DD if explicitly stated, otherwise \"\"",
-      "source": "Email | Teams | Meeting | Other"
+      "source": "Email | Teams | Meeting | Other | Proactive"
     }
   ]
 }
@@ -119,7 +135,11 @@ Invalid JSON or rows without a usable **title** are skipped with readable errors
 
 ## Data persistence
 
-All web data is saved in **localStorage** on this machine for the site origin. There is no server-side persistence, sync, or backup unless you export data yourself. Keys are fixed; renaming them would orphan existing data.
+There is no server-side persistence, sync, or backup unless you export data yourself.
+
+### Browser (`npm run dev`)
+
+Data is saved in **localStorage** for the site origin (for example `http://localhost:5173`). Keys are fixed; renaming them would orphan existing data.
 
 | Key | Contents |
 | --- | --- |
@@ -132,8 +152,13 @@ All web data is saved in **localStorage** on this machine for the site origin. T
 | `tasklane-dropzone-things3-listid` | Optional Things 3 list / project id for exports |
 | `tasklane-dropzone-things3-tags` | Optional tag map JSON for Things exports |
 | `tasklane-dropzone-prompt-tasklane` / `tasklane-dropzone-prompt-things3` | Editable Copilot prompt text for the Drop Zone shelf |
+| `tasklane-dropzone-prompt-tasklane-version` | Prompt version stamp (bump resets a customised Tasklane prompt to the new default) |
 
-Clear site data for this origin in the browser to reset the app (Electron user data is separate for shell settings).
+Clear site data for this origin in the browser to reset the web app.
+
+### Desktop (packaged Tasklane)
+
+Tasks and epics are mirrored to JSON files under `~/Library/Application Support/com.tasklane.app/data/` so DMG reinstalls keep your board. Templates, theme, sidebar width, and Drop Zone settings still use `localStorage` inside the app session, plus `tasklane-settings.json` for the clipboard watcher.
 
 On load, malformed `localStorage` JSON or unexpected shapes do not crash the app: tasks and epics fall back to empty lists; invalid rows are skipped. Tasks without an `archived` field are treated as active. Templates default to the built-in seed list when the key is missing or empty; corrupt template JSON yields an empty list until you add templates again. Task types **Migration** and **Day 2** map to **Execution** and **Follow-up** respectively. Other unknown task types are normalised when data is loaded or saved.
 
@@ -185,6 +210,8 @@ Short-term product ideas (see **`SOURCE_REVIEW.md`** for implementation notes):
 | `npm run preview` | Preview the production build locally |
 | `npm run desktop:dev` | Vite + Electron for local desktop development |
 | `npm run desktop:dist` | Build SPA then run Electron against `dist/` |
+| `node scripts/repair-electron-vendor.mjs` | Fix broken `node_modules/.electron-vendor` symlink before `dist` |
+| `bash scripts/restore-tasklane-profile.sh` | Copy legacy macOS profile data into `com.tasklane.app` |
 
 ## Tech stack
 
@@ -202,7 +229,8 @@ Short-term product ideas (see **`SOURCE_REVIEW.md`** for implementation notes):
 - `src/hooks/` — `useLocalStorage`, `useEpicsStorage`, `useTemplatesStorage`, `useTheme`
 - `src/data/taskMetadata.js` — Task types, priorities, built-in template seed definitions
 - `src/utils/parseDropZoneJSON.js` — Shared Copilot / Things JSON parsing for Drop Zone and board import
-- `electron/main.mjs`, `electron/preload.mjs` — Desktop shell, clipboard helper, Things URL open helper
+- `electron/main.mjs`, `electron/preload.mjs`, `electron/kanbanStorage.mjs` — Desktop shell, stable profile, task/epic file storage, clipboard helper
+- `scripts/repair-electron-vendor.mjs`, `scripts/prepare-electron-dist.mjs`, `scripts/restore-tasklane-profile.sh` — Electron install repair, dist prep, profile restore
 - `public/_redirects` — SPA fallback for Netlify (see Deployment)
 - `vercel.json` — SPA fallback for Vercel (see Deployment)
 
