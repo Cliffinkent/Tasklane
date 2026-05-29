@@ -1,6 +1,12 @@
-# Kanban Task Manager — source review bundle
+# Tasklane — developer handoff
 
-Generated snapshot of selected project files. Excludes `node_modules/`, `dist/`, `build/`, `.git/`, `coverage/`, and lock files.
+Architecture notes and embedded file snapshots for onboarding. **Embedded code blocks below are historical** (captured before Drop Zone, Archive, Templates, and Electron landed). For the live app, use the repository tree and [`README.md`](README.md).
+
+**Current routes:** `/` (board), `/epics`, `/epics/:epicId`, `/templates`, `/archive`, `/dropzone`.
+
+**Key areas not reflected in older snapshots:** `src/pages/DropZone.jsx`, `src/pages/ArchivePage.jsx`, `electron/`, `src/utils/parseDropZoneJSON.js`, `src/data/dropzonePromptDefaults.js`.
+
+Excludes `node_modules/`, `dist/`, `build/`, `.git/`, `coverage/`, and lock files from the snapshot sections.
 
 ## Project tree
 
@@ -2245,7 +2251,7 @@ The app is a static SPA: run `npm run build` and deploy the `dist/` folder. Beca
    ```js
    export default defineConfig({
      plugins: [react()],
-     base: '/YOUR_REPO_NAME/',
+     base: '/Tasklane/',
    })
    ```
 
@@ -2265,7 +2271,7 @@ Visit the printed URL and try `/epics` and a direct refresh to confirm routing w
 
 ## License
 
-Private project; add a license if you plan to publish.
+[MIT](LICENSE) — Copyright (c) 2026 Cliff Parker.
 ```
 
 ---
@@ -2346,4 +2352,10 @@ If Tasklane gains an API and database:
 - Treat **`archived` as a first-class task field** in the schema and API (not as a pseudo-column).
 - Keep the semantic split: **archive = lifecycle**, **`columnId` = board lane**.
 - Filter active vs archived at the service or query layer the same way `App.jsx` does today, so list endpoints for the board and epics never return archived rows unless explicitly requested.
+
+---
+
+## License
+
+[MIT](LICENSE) — Copyright (c) 2026 Cliff Parker. Published under [Cliffinkent/Tasklane](https://github.com/Cliffinkent/Tasklane).
 

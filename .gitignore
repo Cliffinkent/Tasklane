@@ -5,6 +5,8 @@ node_modules
 dist
 release
 *.local
+index-*.js
+icon.png
 
 # Logs
 npm-debug.log*

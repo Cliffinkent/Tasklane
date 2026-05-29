@@ -259,7 +259,7 @@ The app is a static SPA: run `npm run build` and deploy the `dist/` folder. Beca
    ```js
    export default defineConfig({
      plugins: [react()],
-     base: '/YOUR_REPO_NAME/',
+     base: '/Tasklane/',
    })
    ```
 
@@ -279,4 +279,4 @@ Visit the printed URL and try `/epics`, `/archive`, `/dropzone`, and a direct re
 
 ## License
 
-Private project; add a license if you plan to publish.
+[MIT](LICENSE) — Copyright (c) 2026 Cliff Parker. See [Cliffinkent/Tasklane](https://github.com/Cliffinkent/Tasklane) on GitHub.
