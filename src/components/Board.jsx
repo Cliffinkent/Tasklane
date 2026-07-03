@@ -135,6 +135,7 @@ export default function Board({
   onUpdateTask,
   onDeleteTask,
   onArchiveTask,
+  onArchiveAllDone,
 }) {
   const [showForm, setShowForm] = useState(false)
   const [editingTaskId, setEditingTaskId] = useState(null)
@@ -872,6 +873,9 @@ export default function Board({
                 }}
                 onDeleteTask={onDeleteTask}
                 onArchiveTask={onArchiveTask}
+                onArchiveAll={
+                  column.id === 'done' ? onArchiveAllDone : undefined
+                }
               />
             )
           })}

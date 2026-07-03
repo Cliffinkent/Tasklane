@@ -312,6 +312,26 @@ function App() {
     showStatusToast('Task archived')
   }
 
+  function handleArchiveAllDone() {
+    const doneCount = tasks.filter(
+      (t) => t.columnId === 'done' && !t.archived
+    ).length
+    if (doneCount === 0) return
+    const now = new Date().toISOString()
+    setTasks((prev) => {
+      let changed = false
+      const next = prev.map((t) => {
+        if (t.columnId !== 'done' || t.archived) return t
+        changed = true
+        return { ...t, archived: true, updatedAt: now }
+      })
+      return changed ? next : prev
+    })
+    showStatusToast(
+      doneCount === 1 ? 'Task archived' : `${doneCount} tasks archived`
+    )
+  }
+
   function handleRestoreTask(taskId) {
     const task = tasks.find((t) => t.id === taskId)
     if (!task || !task.archived) return
@@ -577,6 +597,7 @@ function App() {
                 onUpdateTask={handleUpdate}
                 onDeleteTask={handleDeleteTask}
                 onArchiveTask={handleArchiveTask}
+                onArchiveAllDone={handleArchiveAllDone}
               />
             }
           />

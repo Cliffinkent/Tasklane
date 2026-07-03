@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, clipboard, shell } from 'electron'
+import { app, BrowserWindow, ipcMain, clipboard, shell, nativeImage } from 'electron'
 import { execFileSync } from 'node:child_process'
 import path from 'node:path'
 import fs from 'node:fs'
@@ -12,6 +12,27 @@ import {
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const isDev = !app.isPackaged
+const APP_ICON_PATH = path.join(__dirname, '..', 'build', 'icon.icns')
+const APP_ICON_PNG_PATH = path.join(__dirname, '..', 'build', 'icon.png')
+
+function getAppIcon() {
+  const candidates = [APP_ICON_PATH, APP_ICON_PNG_PATH]
+  for (const iconPath of candidates) {
+    if (!fs.existsSync(iconPath)) continue
+    const image = nativeImage.createFromPath(iconPath)
+    if (!image.isEmpty()) return image
+  }
+  return null
+}
+
+function applyAppIcon() {
+  const icon = getAppIcon()
+  if (!icon) return null
+  if (process.platform === 'darwin' && app.dock) {
+    app.dock.setIcon(icon)
+  }
+  return icon
+}
 
 ensureStableUserData(app)
 
@@ -141,9 +162,11 @@ function startClipboardWatcherForWindow() {
 }
 
 function createWindow() {
+  const icon = getAppIcon()
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
+    ...(icon ? { icon } : {}),
     webPreferences: {
       preload: path.join(__dirname, 'preload.mjs'),
       contextIsolation: true,
@@ -175,6 +198,7 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  applyAppIcon()
   loadAppSettings()
 
   ipcMain.handle('kanban:load-store', () => {

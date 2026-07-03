@@ -26,6 +26,7 @@ export default function Column({
   onEditTask,
   onDeleteTask,
   onArchiveTask,
+  onArchiveAll,
 }) {
   const { setNodeRef, isOver } = useDroppable({
     id: columnId,
@@ -56,16 +57,33 @@ export default function Column({
           <span className="column-accent-dot" aria-hidden />
           <h2 className="column-title">{title}</h2>
         </div>
-        <span
-          className="column-count"
-          aria-label={
-            filtersActive && totalInColumn !== tasks.length
-              ? `${tasks.length} of ${totalInColumn} tasks in this column match filters`
-              : `${tasks.length} tasks in this column`
-          }
-        >
-          {tasks.length}
-        </span>
+        <div className="column-header-actions">
+          {onArchiveAll ? (
+            <button
+              type="button"
+              className="column-archive-all-btn"
+              onClick={onArchiveAll}
+              disabled={totalInColumn === 0}
+              aria-label={
+                totalInColumn === 0
+                  ? 'No completed tasks to archive'
+                  : `Archive all ${totalInColumn} completed tasks`
+              }
+            >
+              Archive all
+            </button>
+          ) : null}
+          <span
+            className="column-count"
+            aria-label={
+              filtersActive && totalInColumn !== tasks.length
+                ? `${tasks.length} of ${totalInColumn} tasks in this column match filters`
+                : `${tasks.length} tasks in this column`
+            }
+          >
+            {tasks.length}
+          </span>
+        </div>
       </header>
       <div className={`column-cards ${showEmptyState ? 'column-cards--empty' : ''}`}>
         {showEmptyState ? (
